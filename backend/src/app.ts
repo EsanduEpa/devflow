@@ -1,7 +1,20 @@
-import express from 'express'
+import express, { type Router } from 'express'
+import { handleError, notFound } from './middleware/errors.js'
+import { healthRouter } from './modules/health/health.routes.js'
 
-export const app = express()
+export function createApp(apiRouter?: Router) {
+  const app = express()
+  app.disable('x-powered-by')
+  app.use(express.json({ limit: '100kb' }))
+  app.use('/api', healthRouter)
 
-app.get('/api/health', (_request, response) => {
-  response.status(200).json({ status: 'ok' })
-})
+  if (apiRouter) {
+    app.use('/api/v1', apiRouter)
+  }
+
+  app.use(notFound)
+  app.use(handleError)
+  return app
+}
+
+export const app = createApp()
