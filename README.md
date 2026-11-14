@@ -20,6 +20,44 @@ The planned stack is React, TypeScript, Vite, and Tailwind CSS for the frontend,
 | `backend/` | Express API |
 | `docs/` | Requirements, designs, milestone guide, and engineering notes |
 
+## Run locally
+
+Use Node.js 24 and npm. From the repository root, install both apps and copy the local settings after cloning.
+
+```sh
+npm --prefix backend ci
+npm --prefix frontend ci
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+```
+
+Start the backend and frontend in separate terminals from the repository root.
+
+```sh
+npm --prefix backend run dev
+```
+
+```sh
+npm --prefix frontend run dev
+```
+
+Open [DevFlow](http://127.0.0.1:5173). The page checks the Express API at `/api/health` through Vite. You can also call Express directly.
+
+```sh
+curl -i http://127.0.0.1:3000/api/health
+```
+
+If you change `PORT` in `backend/.env`, update `API_PROXY_TARGET` in `frontend/.env` to match and restart both apps. `FRONTEND_PORT` controls the port you open in the browser.
+
+## Check the apps
+
+```sh
+npm --prefix backend run typecheck
+npm --prefix backend run build
+npm --prefix frontend run build
+npm --prefix frontend run lint
+```
+
 ## Progress
 
-M0 prepares the repository and planning documents. Local setup instructions will be added with M1. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.
+M1 sets up the separate React and Express apps and connects them through a health check. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.
