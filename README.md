@@ -33,6 +33,14 @@ cp frontend/.env.example frontend/.env
 
 Set `MONGODB_URI` in `backend/.env` to your Atlas connection string. The backend selects `devflow_db` and connects before opening the API port. Your current IP must be on the project's Atlas access list and your database user needs read and write access to `devflow_db`. [Atlas connection setup](https://www.mongodb.com/docs/atlas/driver-connection/)
 
+Generate a signing key for CSRF protection and put the output in `CSRF_SECRET` in `backend/.env`.
+
+```sh
+openssl rand -hex 32
+```
+
+`APP_ORIGINS` lists the browser origins allowed to submit forms, separated by commas. The defaults accept `http://127.0.0.1:5173` and `http://localhost:5173`. Update the list if you use a different frontend port. For an HTTPS deployment, set `NODE_ENV=production` and list the HTTPS frontend origins.
+
 Start the backend and frontend in separate terminals from the repository root.
 
 ```sh
@@ -43,7 +51,7 @@ npm --prefix backend run dev
 npm --prefix frontend run dev
 ```
 
-Open [DevFlow](http://127.0.0.1:5173). The page checks the Express API at `/api/health` through Vite. You can also call Express directly.
+Open [DevFlow](http://127.0.0.1:5173). Create an account, log in, refresh to check that your session persists, then log out. You can also check Express directly.
 
 ```sh
 curl -i http://127.0.0.1:3000/api/health
@@ -67,8 +75,8 @@ Run the database integration tests separately.
 npm --prefix backend run test:db
 ```
 
-The tests use `devflow_test` and require a transaction-capable MongoDB deployment. Give your configured database user read and write access to `devflow_test`, or set `MONGODB_TEST_URI` in `backend/.env` to use separate test credentials. Each run creates and removes its own temporary collection in the test database.
+The tests use `devflow_test` and require a transaction-capable MongoDB deployment. Give your configured database user read and write access to `devflow_test`, or set `MONGODB_TEST_URI` in `backend/.env` to use separate test credentials. Each run creates and removes its own temporary collections in the test database.
 
 ## Progress
 
-M2 adds MongoDB startup, request validation, standard API errors, and backend integration tests. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.
+M3 adds registration, login, MongoDB-backed sessions, logout, and CSRF protection. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.
