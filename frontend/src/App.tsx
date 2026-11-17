@@ -5,6 +5,7 @@ import { AuthForm } from './features/auth/AuthForm'
 import { ForgotPasswordForm, ResetPasswordForm } from './features/auth/RecoveryForms'
 import { authErrorMessage, currentUser, logout, type PublicUser } from './features/auth/api'
 import { AccountSettings } from './features/profile/AccountSettings'
+import { Workspaces } from './features/workspaces/Workspaces'
 
 function Home({ user }: { user: PublicUser }) {
   const queryClient = useQueryClient()
@@ -30,8 +31,9 @@ function Home({ user }: { user: PublicUser }) {
       <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Welcome, {user.name}</h1>
       <p className="mt-2 break-all text-slate-700">{user.email}</p>
       {error && <p className="mt-5 text-red-900" role="alert">{error}</p>}
-      <div className="mt-6 flex items-center gap-4">
-        <Link to="/profile" className="rounded-lg bg-indigo-700 px-4 py-2 font-medium text-white hover:bg-indigo-800">Profile settings</Link>
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <Link to="/workspaces" className="rounded-lg bg-indigo-700 px-4 py-2 font-medium text-white hover:bg-indigo-800">Workspaces</Link>
+        <Link to="/profile" className="rounded-lg border border-slate-300 px-4 py-2 font-medium hover:bg-slate-50">Profile settings</Link>
         <button onClick={signOut} disabled={pending} className="rounded-lg border border-slate-300 px-4 py-2 font-medium hover:bg-slate-50 disabled:opacity-65">
           {pending ? 'Logging out…' : 'Log out'}
         </button>
@@ -64,6 +66,7 @@ export default function App() {
             <Route path="/login" element={user ? <Navigate to="/" replace /> : <AuthForm key="login" />} />
             <Route path="/register" element={user ? <Navigate to="/" replace /> : <AuthForm key="register" isRegistration />} />
             <Route path="/profile" element={<AccountSettings user={user ?? null} />} />
+            <Route path="/workspaces/*" element={user ? <Workspaces key={user.id} userId={user.id} /> : <Navigate to="/login" replace />} />
             <Route path="/forgot-password" element={<ForgotPasswordForm />} />
             <Route path="/reset-password" element={<ResetPasswordForm />} />
             <Route path="*" element={<Navigate to="/" replace />} />

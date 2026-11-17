@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '../src/app.js'
 import { authConfig } from '../src/config/auth.js'
 import { connectDatabase } from '../src/config/database.js'
-import { createAuthApi } from '../src/modules/auth/auth.routes.js'
+import { createAuthModule } from '../src/modules/auth/auth.routes.js'
 
 const suffix = randomUUID().replaceAll('-', '')
 const collections = { users: `m3_users_${suffix}`, sessions: `m3_sessions_${suffix}`, resetTokens: `m3_reset_tokens_${suffix}` }
@@ -38,7 +38,7 @@ beforeAll(async () => {
 
   try {
     const connection = await connectDatabase(uri, 'devflow_test')
-    app = createApp(await createAuthApi(connection, config, resetEmail, collections))
+    app = createApp((await createAuthModule(connection, config, resetEmail, collections)).router)
     const client = agent()
     const token = await csrfToken(client)
     await client.post(`${path}/register`).set('Origin', origin).set('X-CSRF-Token', token)
@@ -148,7 +148,7 @@ describe('MongoDB-backed authentication', () => {
   }, 15_000)
 
   it('rate limits repeated login and registration requests', async () => {
-    const isolatedApp = createApp(await createAuthApi(mongoose.connection, config, resetEmail, collections))
+    const isolatedApp = createApp((await createAuthModule(mongoose.connection, config, resetEmail, collections)).router)
     const client = request.agent(isolatedApp)
     const token = await csrfToken(client)
     for (const [route, limit] of [['login', 10], ['register', 5]] as const) {
