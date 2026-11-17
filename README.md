@@ -80,6 +80,13 @@ Set `PASSWORD_RESET_ORIGIN` in `backend/.env` if your browser uses a different f
 3. Open **Workspace settings**, edit the name or description, and save. Return to **All workspaces** to see the update.
 4. Copy a workspace URL and open it in a private browser window. Log in with a different test account, then open the copied URL again. The workspace should be absent from that account's list, and the direct URL should display **You don’t have access to this workspace.**
 
+## Test invitations in the browser
+
+1. Log in as a workspace Owner. Open your workspace's **Workspace settings**, enter an invitee email under **Invitations**, pick **Developer** or **Manager**, and choose **Create invitation**.
+2. Copy the generated link. In a private browser window, open the link, check the workspace name and masked email, and register or log in with the invited address.
+3. Choose **Accept invitation**. The invitee opens the workspace and appears under **Members**. Reopen the same link to confirm it can only be used once.
+4. Back as the Owner, refresh **Workspace settings** to see the invitation marked **Accepted**. DevFlow creates the link for you to share directly.
+
 ## Check the apps
 
 ```sh
@@ -100,4 +107,4 @@ The tests use `devflow_test` and require a transaction-capable MongoDB deploymen
 
 ## Progress
 
-M5 adds workspace creation, selection, and Owner-only settings. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.
+M6 adds workspace invitations and member viewing. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.

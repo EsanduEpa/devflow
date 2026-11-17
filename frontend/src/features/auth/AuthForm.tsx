@@ -2,12 +2,14 @@ import { useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { authErrorMessage, login, register } from './api'
+import { readInvitationToken } from './invitation-return'
 import { cardClass, errorClass, fieldClass, linkClass, submitClass, successClass } from '../../shared/form-styles'
 
 export function AuthForm({ isRegistration = false }: { isRegistration?: boolean }) {
   const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
+  const invitationToken = readInvitationToken(location.state)
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
   const title = isRegistration ? 'Create an account' : 'Log in'
@@ -24,12 +26,11 @@ export function AuthForm({ isRegistration = false }: { isRegistration?: boolean 
     try {
       if (isRegistration) {
         await register({ name: String(form.get('name') ?? ''), email, password })
-        navigate('/login', { replace: true, state: { registered: true, email } })
+        navigate('/login', { replace: true, state: { registered: true, email, invitationToken } })
       } else {
         const user = await login({ email, password })
         await queryClient.cancelQueries({ queryKey: ['current-user'] })
         queryClient.setQueryData(['current-user'], user)
-        navigate('/', { replace: true })
       }
     } catch (error) {
       setError(authErrorMessage(error))
@@ -74,7 +75,7 @@ export function AuthForm({ isRegistration = false }: { isRegistration?: boolean 
       </form>
       <p className="mt-6 text-sm text-slate-700">
         {isRegistration ? 'Already have an account? ' : 'New to DevFlow? '}
-        <Link to={isRegistration ? '/login' : '/register'} className={linkClass}>
+        <Link to={isRegistration ? '/login' : '/register'} state={{ invitationToken }} className={linkClass}>
           {isRegistration ? 'Log in' : 'Create an account'}
         </Link>
       </p>

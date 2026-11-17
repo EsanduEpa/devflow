@@ -16,6 +16,7 @@ export async function createApi(
   const router = Router()
 
   router.use(auth.router)
-  router.use('/workspaces', workspaces)
+  router.use('/workspaces', workspaces.router)
+  router.use('/invitations', workspaces.invitationRouter)
   return router
 }
