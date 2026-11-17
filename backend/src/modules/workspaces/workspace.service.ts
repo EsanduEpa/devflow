@@ -32,6 +32,12 @@ export function workspaceService(repository: WorkspaceRepository) {
       return publicWorkspace(workspace, role)
     },
 
+    async listMembers(userId: string, workspaceId: string) {
+      await requireMembership(workspaceId, userId)
+      if (!await repository.findWorkspace(workspaceId)) throw workspaceNotFound()
+      return repository.listMembers(workspaceId)
+    },
+
     async update(userId: string, workspaceId: string, fields: WorkspaceUpdateInput['body']) {
       const { role } = await requireMembership(workspaceId, userId)
       if (role !== 'OWNER') {

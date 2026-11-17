@@ -10,7 +10,7 @@ import { connectDatabase } from '../src/config/database.js'
 const suffix = randomUUID().replaceAll('-', '')
 const collections = {
   auth: { users: `m5_users_${suffix}`, sessions: `m5_sessions_${suffix}`, resetTokens: `m5_resets_${suffix}` },
-  workspace: { workspaces: `m5_workspaces_${suffix}`, members: `m5_members_${suffix}` },
+  workspace: { workspaces: `m5_workspaces_${suffix}`, members: `m5_members_${suffix}`, invitations: `m5_invitations_${suffix}` },
 }
 const origin = 'http://127.0.0.1:5173'
 const auth = '/api/v1/auth'

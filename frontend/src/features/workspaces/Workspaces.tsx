@@ -5,9 +5,11 @@ import { ApiError, apiErrorMessage } from '../../shared/api'
 import { errorClass, fieldClass, linkClass } from '../../shared/form-styles'
 import { createWorkspace, getWorkspace, listWorkspaces, updateWorkspace, workspaceKeys, type Workspace } from './api'
 import { WorkspaceForm } from './WorkspaceForm'
+import { WorkspaceInvitations } from './WorkspaceInvitations'
+import { WorkspaceMembers } from './WorkspaceMembers'
+import { roleLabels } from './workspace-labels'
 
 const panelClass = 'rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7'
-const roleLabels: Record<Workspace['myRole'], string> = { OWNER: 'Owner', MANAGER: 'Manager', DEVELOPER: 'Developer' }
 
 function workspaceUrl(workspaceId: string) {
   return `/workspaces/${workspaceId}`
@@ -134,6 +136,7 @@ function WorkspacePage({ userId, workspaces, settings = false }: { userId: strin
         <>
           <Link className={`text-sm ${linkClass}`} to={workspaceUrl(workspace.id)}>Back to workspace</Link>
           <WorkspaceSettings key={workspace.id} userId={userId} workspace={workspace} />
+          {workspace.myRole === 'OWNER' && <WorkspaceInvitations key={`invites:${workspace.id}`} userId={userId} workspaceId={workspace.id} />}
         </>
       ) : (
         <>
@@ -153,6 +156,7 @@ function WorkspacePage({ userId, workspaces, settings = false }: { userId: strin
             <h2 id="workspace-projects" className="text-lg font-semibold">Projects</h2>
             <p className="mt-2 text-sm text-slate-700">Projects added to {workspace.name} will appear here.</p>
           </section>
+          <WorkspaceMembers userId={userId} workspaceId={workspace.id} />
         </>
       )}
     </>

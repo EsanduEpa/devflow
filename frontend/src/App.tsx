@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, Navigate, Route, Routes } from 'react-router'
+import { Link, Navigate, Route, Routes, useLocation, useParams } from 'react-router'
 import { AuthForm } from './features/auth/AuthForm'
 import { ForgotPasswordForm, ResetPasswordForm } from './features/auth/RecoveryForms'
 import { authErrorMessage, currentUser, logout, type PublicUser } from './features/auth/api'
+import { afterAuthentication, readInvitationToken } from './features/auth/invitation-return'
 import { AccountSettings } from './features/profile/AccountSettings'
 import { Workspaces } from './features/workspaces/Workspaces'
+import { InvitationPage } from './features/workspaces/InvitationPage'
 
 function Home({ user }: { user: PublicUser }) {
   const queryClient = useQueryClient()
@@ -42,7 +44,14 @@ function Home({ user }: { user: PublicUser }) {
   )
 }
 
+function InvitationRoute({ user }: { user: PublicUser | null }) {
+  const { token } = useParams()
+  return <InvitationPage key={token} user={user} />
+}
+
 export default function App() {
+  const { state } = useLocation()
+  const signedInPath = afterAuthentication(readInvitationToken(state))
   const { data: user, isPending, isError, error, refetch } = useQuery({
     queryKey: ['current-user'],
     queryFn: ({ signal }) => currentUser(signal),
@@ -63,10 +72,11 @@ export default function App() {
         ) : (
           <Routes>
             <Route path="/" element={user ? <Home user={user} /> : <Navigate to="/login" replace />} />
-            <Route path="/login" element={user ? <Navigate to="/" replace /> : <AuthForm key="login" />} />
-            <Route path="/register" element={user ? <Navigate to="/" replace /> : <AuthForm key="register" isRegistration />} />
+            <Route path="/login" element={user ? <Navigate to={signedInPath} replace /> : <AuthForm key="login" />} />
+            <Route path="/register" element={user ? <Navigate to={signedInPath} replace /> : <AuthForm key="register" isRegistration />} />
             <Route path="/profile" element={<AccountSettings user={user ?? null} />} />
             <Route path="/workspaces/*" element={user ? <Workspaces key={user.id} userId={user.id} /> : <Navigate to="/login" replace />} />
+            <Route path="/invitations/:token" element={<InvitationRoute user={user ?? null} />} />
             <Route path="/forgot-password" element={<ForgotPasswordForm />} />
             <Route path="/reset-password" element={<ResetPasswordForm />} />
             <Route path="*" element={<Navigate to="/" replace />} />

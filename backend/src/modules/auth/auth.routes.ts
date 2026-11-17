@@ -67,5 +67,5 @@ export async function createAuthModule(
   router.post('/auth/reset-password', csrf.verifyToken, authLimiter(10), validateRequest(resetPasswordSchema), controller.resetPassword)
   router.use('/users', userRoutes(users, sessions, service, cookies, csrf.verifyToken, authLimiter(10)))
 
-  return { router, requireUser, verifyCsrf: csrf.verifyToken }
+  return { router, requireUser, verifyCsrf: csrf.verifyToken, users }
 }

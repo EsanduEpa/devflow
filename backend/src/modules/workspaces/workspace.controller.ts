@@ -25,5 +25,10 @@ export function workspaceController(service: WorkspaceService) {
     response.json({ data: await service.update(user.id, input.params.id, input.body) })
   }
 
-  return { list, create, details, update }
+  const listMembers: WorkspaceRequest<WorkspaceDetailsInput> = async (_request, response) => {
+    const { user, input } = response.locals
+    response.json({ data: await service.listMembers(user.id, input.params.id) })
+  }
+
+  return { list, create, details, update, listMembers }
 }
