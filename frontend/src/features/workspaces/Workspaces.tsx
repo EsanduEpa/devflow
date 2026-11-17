@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate, Route, Routes, useNavigate, useParams } from 'react-router'
 import { ApiError, apiErrorMessage } from '../../shared/api'
 import { errorClass, fieldClass, linkClass } from '../../shared/form-styles'
+import { ProjectCreatePage } from '../projects/ProjectCreatePage'
+import { WorkspaceProjects } from '../projects/WorkspaceProjects'
 import { createWorkspace, getWorkspace, listWorkspaces, updateWorkspace, workspaceKeys, type Workspace } from './api'
 import { WorkspaceForm } from './WorkspaceForm'
 import { WorkspaceInvitations } from './WorkspaceInvitations'
@@ -152,10 +154,7 @@ function WorkspacePage({ userId, workspaces, settings = false }: { userId: strin
             </div>
             {workspace.description && <p className="mt-4 break-words whitespace-pre-wrap text-slate-700">{workspace.description}</p>}
           </section>
-          <section className={panelClass} aria-labelledby="workspace-projects">
-            <h2 id="workspace-projects" className="text-lg font-semibold">Projects</h2>
-            <p className="mt-2 text-sm text-slate-700">Projects added to {workspace.name} will appear here.</p>
-          </section>
+          <WorkspaceProjects key={`projects:${workspace.id}`} workspace={workspace} userId={userId} />
           <WorkspaceMembers userId={userId} workspaceId={workspace.id} />
         </>
       )}
@@ -185,6 +184,7 @@ export function Workspaces({ userId }: { userId: string }) {
         <Route index element={<WorkspaceList userId={userId} query={list} />} />
         <Route path=":workspaceId" element={<WorkspacePage userId={userId} workspaces={workspaces} />} />
         <Route path=":workspaceId/settings" element={<WorkspacePage userId={userId} workspaces={workspaces} settings />} />
+        <Route path=":workspaceId/projects/new" element={<ProjectCreatePage userId={userId} />} />
         <Route path="*" element={<Navigate to="/workspaces" replace />} />
       </Routes>
     </div>

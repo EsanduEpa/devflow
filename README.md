@@ -87,6 +87,12 @@ Set `PASSWORD_RESET_ORIGIN` in `backend/.env` if your browser uses a different f
 3. Choose **Accept invitation**. The invitee opens the workspace and appears under **Members**. Reopen the same link to confirm it can only be used once.
 4. Back as the Owner, refresh **Workspace settings** to see the invitation marked **Accepted**. DevFlow creates the link for you to share directly.
 
+## Test projects in the browser
+
+1. Log in as a workspace Owner. Open a workspace and click **Create project**. Enter a name, optionally add dates, choose yourself or an eligible Manager, and save. The project overview should show the selected manager, status, and dates.
+2. Return to the workspace and filter **Projects** by status. Archived projects appear when you select **Archived**. Workspaces with more than 20 matching projects have page controls.
+3. Use a Manager account to verify that creating a project assigns it to that Manager. As a Developer, verify that the create form is unavailable and opening the URL of a project you do not belong to shows an access message.
+
 ## Check the apps
 
 ```sh
@@ -107,4 +113,4 @@ The tests use `devflow_test` and require a transaction-capable MongoDB deploymen
 
 ## Progress
 
-M6 adds workspace invitations and member viewing. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.
+M7 adds project creation, project listing, and project access rules. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.

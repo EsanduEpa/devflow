@@ -6,6 +6,7 @@ import { ForgotPasswordForm, ResetPasswordForm } from './features/auth/RecoveryF
 import { authErrorMessage, currentUser, logout, type PublicUser } from './features/auth/api'
 import { afterAuthentication, readInvitationToken } from './features/auth/invitation-return'
 import { AccountSettings } from './features/profile/AccountSettings'
+import { ProjectDetailsPage } from './features/projects/ProjectDetailsPage'
 import { Workspaces } from './features/workspaces/Workspaces'
 import { InvitationPage } from './features/workspaces/InvitationPage'
 
@@ -76,6 +77,7 @@ export default function App() {
             <Route path="/register" element={user ? <Navigate to={signedInPath} replace /> : <AuthForm key="register" isRegistration />} />
             <Route path="/profile" element={<AccountSettings user={user ?? null} />} />
             <Route path="/workspaces/*" element={user ? <Workspaces key={user.id} userId={user.id} /> : <Navigate to="/login" replace />} />
+            <Route path="/projects/:projectId" element={user ? <ProjectDetailsPage key={user.id} userId={user.id} /> : <Navigate to="/login" replace />} />
             <Route path="/invitations/:token" element={<InvitationRoute user={user ?? null} />} />
             <Route path="/forgot-password" element={<ForgotPasswordForm />} />
             <Route path="/reset-password" element={<ResetPasswordForm />} />
