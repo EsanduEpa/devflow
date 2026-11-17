@@ -59,6 +59,20 @@ curl -i http://127.0.0.1:3000/api/health
 
 If you change `PORT` in `backend/.env`, update `API_PROXY_TARGET` in `frontend/.env` to match and restart both apps. `FRONTEND_PORT` controls the port you open in the browser.
 
+## Test password recovery in the browser
+
+With Docker running, start a local Mailpit inbox in a third terminal. The backend defaults to sending recovery mail to this local inbox.
+
+```sh
+docker run --rm --name devflow-mailpit -p 127.0.0.1:1025:1025 -p 127.0.0.1:8025:8025 axllent/mailpit
+```
+
+1. Register a test account and log in. Open **Profile settings** to update your name or bio, try changing your email with your current password, then change your password. You should be sent back to login.
+2. From the login page, select **Forgot password?** and enter the account's current email.
+3. Open the [Mailpit inbox](http://127.0.0.1:8025), follow the link in the email, and choose a new password. Sign in with the new password. Opening the same link again and trying another reset should fail.
+
+Set `PASSWORD_RESET_ORIGIN` in `backend/.env` if your browser uses a different frontend address. It must match an entry in `APP_ORIGINS`. To deliver mail to real inboxes, configure your SMTP provider with `SMTP_HOST`, `SMTP_PORT`, `MAIL_FROM`, and, if needed, `SMTP_USER` and `SMTP_PASSWORD`. The backend uses TLS on port 465 and requires STARTTLS for other remote SMTP connections. [Nodemailer SMTP settings](https://nodemailer.com/smtp)
+
 ## Check the apps
 
 ```sh
@@ -75,8 +89,8 @@ Run the database integration tests separately.
 npm --prefix backend run test:db
 ```
 
-The tests use `devflow_test` and require a transaction-capable MongoDB deployment. Give your configured database user read and write access to `devflow_test`, or set `MONGODB_TEST_URI` in `backend/.env` to use separate test credentials. Each run creates and removes its own temporary collections in the test database.
+The tests use `devflow_test` and require a transaction-capable MongoDB deployment. Give your configured database user read and write access to `devflow_test`, or set `MONGODB_TEST_URI` in `backend/.env` to use separate test credentials. Each run creates and removes its own temporary collections. The password recovery tests use a temporary local inbox, so they run without Mailpit or real email credentials.
 
 ## Progress
 
-M3 adds registration, login, MongoDB-backed sessions, logout, and CSRF protection. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.
+M4 adds profile editing, password changes, and email-based password recovery to the M3 authentication flows. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.

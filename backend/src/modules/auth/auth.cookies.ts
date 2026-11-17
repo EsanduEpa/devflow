@@ -1,4 +1,4 @@
-import type { CookieOptions, Request } from 'express'
+import type { CookieOptions, Request, Response } from 'express'
 import type { AuthConfig } from '../../config/auth.js'
 
 export function authCookies(config: AuthConfig) {
@@ -14,6 +14,11 @@ export function authCookies(config: AuthConfig) {
 }
 
 export type AuthCookies = ReturnType<typeof authCookies>
+
+export function clearAuthCookies(response: Response, cookies: AuthCookies) {
+  response.clearCookie(cookies.session, cookies.options)
+  response.clearCookie(cookies.csrf, cookies.options)
+}
 
 export function readSessionCookie(request: Pick<Request, 'cookies'>, cookies: AuthCookies): string | undefined {
   const value: unknown = request.cookies?.[cookies.session]

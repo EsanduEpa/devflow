@@ -1,10 +1,11 @@
 import type { Request, RequestHandler } from 'express'
 import type { AuthenticatedLocals } from '../../middleware/authenticate.js'
-import { readSessionCookie, type AuthCookies } from './auth.cookies.js'
-import type { Credentials, Registration } from './auth.schemas.js'
+import { clearAuthCookies, readSessionCookie, type AuthCookies } from './auth.cookies.js'
+import type { Credentials, ForgotPassword, Registration, ResetPassword } from './auth.schemas.js'
 import type { AuthService } from './auth.service.js'
+import type { PasswordResetService } from './password-reset.service.js'
 
-export function authController(service: AuthService, cookies: AuthCookies) {
+export function authController(service: AuthService, recovery: PasswordResetService, cookies: AuthCookies) {
   const register: RequestHandler<Request['params'], unknown, unknown, unknown, { input: { body: Registration } }> =
     async (_request, response) => {
       const user = await service.register(response.locals.input.body)
@@ -24,10 +25,26 @@ export function authController(service: AuthService, cookies: AuthCookies) {
 
   const logout: RequestHandler = async (request, response) => {
     await service.logout(readSessionCookie(request, cookies))
-    response.clearCookie(cookies.session, cookies.options)
-    response.clearCookie(cookies.csrf, cookies.options)
+    clearAuthCookies(response, cookies)
     response.status(204).end()
   }
 
-  return { register, login, currentUser, logout }
+  const forgotPassword: RequestHandler<Request['params'], unknown, unknown, unknown, { input: { body: ForgotPassword } }> =
+    (_request, response) => {
+      const { email } = response.locals.input.body
+      response.status(202).json({
+        data: { message: 'If an account exists, password reset instructions will be sent.' },
+      })
+      void recovery.requestReset(email).catch(() => {
+        console.error('DevFlow password recovery could not process the email request.')
+      })
+    }
+
+  const resetPassword: RequestHandler<Request['params'], unknown, unknown, unknown, { input: { body: ResetPassword } }> =
+    async (_request, response) => {
+      await recovery.resetPassword(response.locals.input.body)
+      response.status(204).end()
+    }
+
+  return { register, login, currentUser, logout, forgotPassword, resetPassword }
 }

@@ -2,8 +2,8 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import type { Request, RequestHandler } from 'express'
 import type { AuthConfig } from '../config/auth.js'
 import { readSessionCookie, type AuthCookies } from '../modules/auth/auth.cookies.js'
-import { randomToken } from '../modules/auth/auth.service.js'
 import { ApiError } from '../shared/api-error.js'
+import { randomToken } from '../shared/credentials.js'
 
 const tokenLifetime = 60 * 60 * 1000
 const tokenFormat = /^([\w-]{43})\.(\d{13})\.([\w-]{43})$/
