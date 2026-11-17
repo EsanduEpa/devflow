@@ -8,12 +8,13 @@ import { connectDatabase } from '../src/config/database.js'
 import { createAuthApi } from '../src/modules/auth/auth.routes.js'
 
 const suffix = randomUUID().replaceAll('-', '')
-const collections = { users: `m3_users_${suffix}`, sessions: `m3_sessions_${suffix}` }
+const collections = { users: `m3_users_${suffix}`, sessions: `m3_sessions_${suffix}`, resetTokens: `m3_reset_tokens_${suffix}` }
 const origin = 'http://127.0.0.1:5173'
 const credentials = { email: 'alex@example.test', password: 'DevFlowExamplePassword!' }
 const registration = { ...credentials, name: 'Alex Perera', email: 'register@example.test' }
 const path = '/api/v1/auth'
 const config = authConfig({ CSRF_SECRET: randomBytes(32).toString('hex') })
+const resetEmail = { origin, async sendResetEmail() { throw new Error('M3 tests do not send password reset email.') } }
 let app: ReturnType<typeof createApp>
 
 function agent() {
@@ -37,7 +38,7 @@ beforeAll(async () => {
 
   try {
     const connection = await connectDatabase(uri, 'devflow_test')
-    app = createApp(await createAuthApi(connection, config, collections))
+    app = createApp(await createAuthApi(connection, config, resetEmail, collections))
     const client = agent()
     const token = await csrfToken(client)
     await client.post(`${path}/register`).set('Origin', origin).set('X-CSRF-Token', token)
@@ -147,7 +148,7 @@ describe('MongoDB-backed authentication', () => {
   }, 15_000)
 
   it('rate limits repeated login and registration requests', async () => {
-    const isolatedApp = createApp(await createAuthApi(mongoose.connection, config, collections))
+    const isolatedApp = createApp(await createAuthApi(mongoose.connection, config, resetEmail, collections))
     const client = request.agent(isolatedApp)
     const token = await csrfToken(client)
     for (const [route, limit] of [['login', 10], ['register', 5]] as const) {

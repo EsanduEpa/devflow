@@ -4,6 +4,7 @@ export const sessionLifetime = 7 * 24 * 60 * 60 * 1000
 
 const sessionSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  passwordVersion: { type: Number, required: true, default: 0 },
   tokenHash: { type: String, required: true, select: false },
   createdAt: { type: Date, required: true, default: Date.now },
   expiresAt: {

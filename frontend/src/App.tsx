@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Navigate, Route, Routes } from 'react-router'
+import { Link, Navigate, Route, Routes } from 'react-router'
 import { AuthForm } from './features/auth/AuthForm'
+import { ForgotPasswordForm, ResetPasswordForm } from './features/auth/RecoveryForms'
 import { authErrorMessage, currentUser, logout, type PublicUser } from './features/auth/api'
+import { AccountSettings } from './features/profile/AccountSettings'
 
 function Home({ user }: { user: PublicUser }) {
   const queryClient = useQueryClient()
@@ -28,9 +30,12 @@ function Home({ user }: { user: PublicUser }) {
       <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Welcome, {user.name}</h1>
       <p className="mt-2 break-all text-slate-700">{user.email}</p>
       {error && <p className="mt-5 text-red-900" role="alert">{error}</p>}
-      <button onClick={signOut} disabled={pending} className="mt-6 rounded-lg border border-slate-300 px-4 py-2 font-medium hover:bg-slate-50 disabled:opacity-65">
-        {pending ? 'Logging out…' : 'Log out'}
-      </button>
+      <div className="mt-6 flex items-center gap-4">
+        <Link to="/profile" className="rounded-lg bg-indigo-700 px-4 py-2 font-medium text-white hover:bg-indigo-800">Profile settings</Link>
+        <button onClick={signOut} disabled={pending} className="rounded-lg border border-slate-300 px-4 py-2 font-medium hover:bg-slate-50 disabled:opacity-65">
+          {pending ? 'Logging out…' : 'Log out'}
+        </button>
+      </div>
     </section>
   )
 }
@@ -58,6 +63,9 @@ export default function App() {
             <Route path="/" element={user ? <Home user={user} /> : <Navigate to="/login" replace />} />
             <Route path="/login" element={user ? <Navigate to="/" replace /> : <AuthForm key="login" />} />
             <Route path="/register" element={user ? <Navigate to="/" replace /> : <AuthForm key="register" isRegistration />} />
+            <Route path="/profile" element={<AccountSettings user={user ?? null} />} />
+            <Route path="/forgot-password" element={<ForgotPasswordForm />} />
+            <Route path="/reset-password" element={<ResetPasswordForm />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         )}

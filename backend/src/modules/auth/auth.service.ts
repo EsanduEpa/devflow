@@ -1,23 +1,10 @@
-import { createHash, randomBytes } from 'node:crypto'
-import { argon2id, hash, verify } from 'argon2'
-import mongoose from 'mongoose'
+import { verify } from 'argon2'
 import { ApiError } from '../../shared/api-error.js'
-import { publicUser } from '../users/user.model.js'
+import { hashPassword, hashToken, randomToken } from '../../shared/credentials.js'
+import { publicUser, rethrowUserWriteError } from '../users/user.model.js'
 import type { AuthRepository } from './auth.repository.js'
 import type { Credentials, Registration } from './auth.schemas.js'
 import { sessionLifetime } from './session.model.js'
-
-function hashPassword(password: string) {
-  return hash(password, { type: argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1 })
-}
-
-export function randomToken() {
-  return randomBytes(32).toString('base64url')
-}
-
-export function hashToken(token: string) {
-  return createHash('sha256').update(token).digest('hex')
-}
 
 export async function authService(repository: AuthRepository) {
   const dummyPasswordHash = await hashPassword(randomToken())
@@ -28,10 +15,7 @@ export async function authService(repository: AuthRepository) {
       try {
         return publicUser(await repository.createUser(name, email, passwordHash))
       } catch (error) {
-        if (error instanceof mongoose.mongo.MongoServerError && error.code === 11000) {
-          throw new ApiError(409, 'EMAIL_ALREADY_EXISTS', 'An account already uses this email address.')
-        }
-        throw error
+        rethrowUserWriteError(error)
       }
     },
 
@@ -45,14 +29,20 @@ export async function authService(repository: AuthRepository) {
       const token = randomToken()
       const createdAt = new Date()
       const expiresAt = new Date(createdAt.getTime() + sessionLifetime)
-      await repository.createSession(user._id, hashToken(token), createdAt, expiresAt, previousToken && hashToken(previousToken))
+      await repository.createSession({
+        userId: user._id,
+        passwordVersion: user.passwordVersion,
+        tokenHash: hashToken(token),
+        createdAt,
+        expiresAt,
+      }, previousToken && hashToken(previousToken))
       return { user: publicUser(user), token, expiresAt }
     },
 
     async currentUser(token?: string) {
       const session = token && await repository.findActiveSession(hashToken(token))
       const user = session && await repository.findUser(session.userId)
-      if (!user) {
+      if (!session || !user || session.passwordVersion !== user.passwordVersion) {
         throw new ApiError(401, 'UNAUTHENTICATED', 'Log in to continue.')
       }
       return publicUser(user)
