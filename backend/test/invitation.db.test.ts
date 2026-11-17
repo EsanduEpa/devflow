@@ -12,6 +12,7 @@ const suffix = randomUUID().replaceAll('-', '')
 const collections = {
   auth: { users: `m6_users_${suffix}`, sessions: `m6_sessions_${suffix}`, resetTokens: `m6_resets_${suffix}` },
   workspace: { workspaces: `m6_workspaces_${suffix}`, members: `m6_members_${suffix}`, invitations: `m6_invites_${suffix}` },
+  project: { projects: `m6_projects_${suffix}`, members: `m6_project_members_${suffix}` },
 }
 const origin = 'http://127.0.0.1:5173'
 const auth = '/api/v1/auth'
@@ -87,7 +88,7 @@ afterAll(async () => {
   try {
     const db = mongoose.connection.db
     if (db && mongoose.connection.readyState === 1) {
-      for (const name of [...Object.values(collections.auth), ...Object.values(collections.workspace)]) {
+      for (const name of Object.values(collections).flatMap((group) => Object.values(group))) {
         if (await db.listCollections({ name }, { nameOnly: true }).hasNext()) await db.dropCollection(name)
       }
     }

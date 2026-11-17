@@ -55,5 +55,5 @@ export async function createWorkspaceRoutes(
   })
   invitationRouter.get('/:token', validateRequest(invitationPreviewSchema), invitations.preview)
   invitationRouter.post('/:token/accept', requireUser, verifyCsrf, validateRequest(invitationAcceptSchema), invitations.accept)
-  return { router, invitationRouter }
+  return { router, invitationRouter, service, members }
 }
