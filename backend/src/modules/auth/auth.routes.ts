@@ -32,11 +32,13 @@ function authLimiter(limit: number) {
   })
 }
 
-export async function createAuthApi(
+export type AuthCollections = { users: string; sessions: string; resetTokens: string }
+
+export async function createAuthModule(
   connection: Connection,
   config: AuthConfig,
   emailConfig: ResetEmailConfig,
-  collections?: { users: string; sessions: string; resetTokens: string },
+  collections?: AuthCollections,
 ) {
   const users = userModel(connection, collections?.users)
   const sessions = sessionModel(connection, collections?.sessions)
@@ -46,6 +48,7 @@ export async function createAuthApi(
   const service = await authService(authRepository(users, sessions))
   const cookies = authCookies(config)
   const csrf = csrfProtection(config, cookies)
+  const requireUser = authenticate(service, cookies)
   const recovery = passwordResetService(passwordResetRepository(users, sessions, resetTokens), emailConfig)
   const controller = authController(service, recovery, cookies)
   const router = Router()
@@ -59,10 +62,10 @@ export async function createAuthApi(
   router.post('/auth/register', csrf.verifyToken, authLimiter(5), validateRequest(registerSchema), controller.register)
   router.post('/auth/login', csrf.verifyToken, authLimiter(10), validateRequest(loginSchema), controller.login)
   router.post('/auth/logout', csrf.verifyToken, validateRequest(logoutSchema), controller.logout)
-  router.get('/auth/me', authenticate(service, cookies), controller.currentUser)
+  router.get('/auth/me', requireUser, controller.currentUser)
   router.post('/auth/forgot-password', csrf.verifyToken, authLimiter(5), validateRequest(forgotPasswordSchema), controller.forgotPassword)
   router.post('/auth/reset-password', csrf.verifyToken, authLimiter(10), validateRequest(resetPasswordSchema), controller.resetPassword)
   router.use('/users', userRoutes(users, sessions, service, cookies, csrf.verifyToken, authLimiter(10)))
 
-  return router
+  return { router, requireUser, verifyCsrf: csrf.verifyToken }
 }

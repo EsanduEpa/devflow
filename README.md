@@ -73,6 +73,13 @@ docker run --rm --name devflow-mailpit -p 127.0.0.1:1025:1025 -p 127.0.0.1:8025:
 
 Set `PASSWORD_RESET_ORIGIN` in `backend/.env` if your browser uses a different frontend address. It must match an entry in `APP_ORIGINS`. To deliver mail to real inboxes, configure your SMTP provider with `SMTP_HOST`, `SMTP_PORT`, `MAIL_FROM`, and, if needed, `SMTP_USER` and `SMTP_PASSWORD`. The backend uses TLS on port 465 and requires STARTTLS for other remote SMTP connections. [Nodemailer SMTP settings](https://nodemailer.com/smtp)
 
+## Test workspaces in the browser
+
+1. Log in, open **Workspaces**, and use **New workspace** to create two workspaces.
+2. From a workspace, use **Switch workspace** to open the other. The workspace details and Projects section should show the selected workspace. Refresh to verify that the selection stays on the same workspace.
+3. Open **Workspace settings**, edit the name or description, and save. Return to **All workspaces** to see the update.
+4. Copy a workspace URL and open it in a private browser window. Log in with a different test account, then open the copied URL again. The workspace should be absent from that account's list, and the direct URL should display **You don’t have access to this workspace.**
+
 ## Check the apps
 
 ```sh
@@ -93,4 +100,4 @@ The tests use `devflow_test` and require a transaction-capable MongoDB deploymen
 
 ## Progress
 
-M4 adds profile editing, password changes, and email-based password recovery to the M3 authentication flows. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.
+M5 adds workspace creation, selection, and Owner-only settings. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { authErrorMessage, login, register } from './api'
-import { cardClass, errorClass, fieldClass, linkClass, submitClass, successClass } from './form-styles'
+import { cardClass, errorClass, fieldClass, linkClass, submitClass, successClass } from '../../shared/form-styles'
 
 export function AuthForm({ isRegistration = false }: { isRegistration?: boolean }) {
   const navigate = useNavigate()

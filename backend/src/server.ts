@@ -1,8 +1,8 @@
+import { createApi } from './api.js'
 import { createApp } from './app.js'
 import { authConfig } from './config/auth.js'
 import { connectDatabase } from './config/database.js'
 import { resetEmailConfig } from './config/reset-email.js'
-import { createAuthApi } from './modules/auth/auth.routes.js'
 
 const uri = process.env.MONGODB_URI?.trim()
 if (!uri) {
@@ -27,8 +27,8 @@ const connection = await connectDatabase(uri, 'devflow_db')
   })
 console.log('Connected to MongoDB (devflow_db).')
 
-const api = await createAuthApi(connection, config.auth, config.resetEmail).catch(() => {
-  console.error('Could not initialize authentication. Check database permissions and indexes.')
+const api = await createApi(connection, config.auth, config.resetEmail).catch(() => {
+  console.error('Could not initialize the DevFlow API. Check database permissions and indexes.')
   process.exit(1)
 })
 const app = createApp(api)

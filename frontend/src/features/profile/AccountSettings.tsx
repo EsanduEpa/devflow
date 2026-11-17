@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate } from 'react-router'
 import { authErrorMessage, changePassword, updateProfile, type PublicUser } from '../auth/api'
-import { cardClass, errorClass, fieldClass, linkClass, submitClass, successClass } from '../auth/form-styles'
+import { cardClass, errorClass, fieldClass, linkClass, submitClass, successClass } from '../../shared/form-styles'
 
 function EditProfile({ user }: { user: PublicUser }) {
   const queryClient = useQueryClient()

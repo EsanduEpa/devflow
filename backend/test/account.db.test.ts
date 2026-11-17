@@ -6,7 +6,7 @@ import { createApp } from '../src/app.js'
 import { authConfig } from '../src/config/auth.js'
 import { connectDatabase } from '../src/config/database.js'
 import { resetEmailConfig } from '../src/config/reset-email.js'
-import { createAuthApi } from '../src/modules/auth/auth.routes.js'
+import { createAuthModule } from '../src/modules/auth/auth.routes.js'
 import { hashToken } from '../src/shared/credentials.js'
 import { startTestInbox } from './fixtures/smtp.js'
 
@@ -63,7 +63,7 @@ beforeAll(async () => {
   const connection = await connectDatabase(uri, 'devflow_test')
   inbox = await startTestInbox()
   const email = resetEmailConfig({ SMTP_PORT: String(inbox.port) }, config)
-  app = createApp(await createAuthApi(connection, config, email, collections))
+  app = createApp((await createAuthModule(connection, config, email, collections)).router)
 }, 20_000)
 
 afterAll(async () => {
