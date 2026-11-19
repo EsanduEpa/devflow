@@ -78,6 +78,7 @@ export default function App() {
             <Route path="/profile" element={<AccountSettings user={user ?? null} />} />
             <Route path="/workspaces/*" element={user ? <Workspaces key={user.id} userId={user.id} /> : <Navigate to="/login" replace />} />
             <Route path="/projects/:projectId" element={user ? <ProjectDetailsPage key={user.id} userId={user.id} /> : <Navigate to="/login" replace />} />
+            <Route path="/projects/:projectId/settings" element={user ? <ProjectDetailsPage key={user.id} userId={user.id} settings /> : <Navigate to="/login" replace />} />
             <Route path="/invitations/:token" element={<InvitationRoute user={user ?? null} />} />
             <Route path="/forgot-password" element={<ForgotPasswordForm />} />
             <Route path="/reset-password" element={<ResetPasswordForm />} />

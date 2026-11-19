@@ -7,13 +7,15 @@ const params = z.strictObject({ id })
 const queryInteger = z.string().regex(/^\d+$/, 'Enter a positive whole number.').transform(Number).pipe(z.int().positive())
 const dateOnly = z.iso.date().nullable().default(null)
 const status = z.enum(projectStatuses)
+const name = z.string().trim().min(3).max(150)
+const description = z.string().trim().max(2000)
 
 export const projectCreateSchema = z.object({
   params,
   query: z.strictObject({}),
   body: z.strictObject({
-    name: z.string().trim().min(3).max(150),
-    description: z.string().trim().max(2000).default(''),
+    name,
+    description: description.default(''),
     managerId: id,
     startDate: dateOnly,
     targetDate: dateOnly,
@@ -37,7 +39,25 @@ export const projectListSchema = z.object({
 })
 
 export const projectDetailsSchema = z.object({ params, query: z.strictObject({}) })
+export const projectUpdateSchema = projectDetailsSchema.extend({
+  body: z.strictObject({
+    name,
+    description,
+    managerId: id,
+    startDate: z.iso.date().nullable(),
+    targetDate: z.iso.date().nullable(),
+    status,
+  }).partial().refine((fields) => Object.keys(fields).length > 0, {
+    message: 'Provide at least one project field to update.',
+  }),
+})
+
+export const projectMemberAddSchema = projectDetailsSchema.extend({ body: z.strictObject({ userId: id }) })
+export const projectMemberRemoveSchema = projectDetailsSchema.extend({ params: params.extend({ userId: id }) })
 
 export type ProjectCreateInput = z.infer<typeof projectCreateSchema>
 export type ProjectListInput = z.infer<typeof projectListSchema>
 export type ProjectDetailsInput = z.infer<typeof projectDetailsSchema>
+export type ProjectUpdateInput = z.infer<typeof projectUpdateSchema>
+export type ProjectMemberAddInput = z.infer<typeof projectMemberAddSchema>
+export type ProjectMemberRemoveInput = z.infer<typeof projectMemberRemoveSchema>

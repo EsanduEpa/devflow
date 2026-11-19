@@ -1,4 +1,4 @@
-import { Types } from 'mongoose'
+import { Types, type ClientSession } from 'mongoose'
 import type { userModel } from '../users/user.model.js'
 import type { WorkspaceRecord, workspaceModel } from './workspace.model.js'
 import type { WorkspaceRole, workspaceMemberModel } from './workspace-member.model.js'
@@ -42,8 +42,8 @@ export function workspaceRepository(
       ]).exec()
     },
 
-    findMembership(workspaceId: string, userId: string) {
-      return members.findOne({ workspaceId, userId }).lean().exec()
+    findMembership(workspaceId: string, userId: string, session?: ClientSession) {
+      return members.findOne({ workspaceId, userId }).session(session ?? null).lean().exec()
     },
 
     listMembers(workspaceId: string) {
@@ -68,8 +68,8 @@ export function workspaceRepository(
       ]).exec()
     },
 
-    findWorkspace(id: string) {
-      return workspaces.findById(id).lean().exec()
+    findWorkspace(id: string, session?: ClientSession) {
+      return workspaces.findById(id).session(session ?? null).lean().exec()
     },
 
     updateWorkspace(id: string, ownerId: string, fields: WorkspaceUpdateInput['body']) {

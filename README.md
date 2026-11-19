@@ -93,6 +93,13 @@ Set `PASSWORD_RESET_ORIGIN` in `backend/.env` if your browser uses a different f
 2. Return to the workspace and filter **Projects** by status. Archived projects appear when you select **Archived**. Workspaces with more than 20 matching projects have page controls.
 3. Use a Manager account to verify that creating a project assigns it to that Manager. As a Developer, verify that the create form is unavailable and opening the URL of a project you do not belong to shows an access message.
 
+## Test project settings in the browser
+
+1. Open a project as the workspace Owner or its assigned Manager and choose **Project settings**. Edit the name, description, or dates and save.
+2. Under **Project members**, choose a Developer who belongs to the workspace and add them. In a separate browser window, log in as that Developer. They can open the project and see its members. Remove them from the project and reload their window to confirm access is revoked.
+3. Choose another eligible Manager in **Project manager** and save. The new Manager appears in the member list automatically. The previous Manager remains a project member and can now be removed.
+4. Select **Archived** as the status and choose **Archive project**. Open it again from the workspace’s **Archived** filter. Choose another status in settings and select **Restore project**.
+
 ## Check the apps
 
 ```sh
@@ -113,4 +120,4 @@ The tests use `devflow_test` and require a transaction-capable MongoDB deploymen
 
 ## Progress
 
-M7 adds project creation, project listing, and project access rules. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.
+M8 adds project settings, member management, manager reassignment, and archive and restore. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.

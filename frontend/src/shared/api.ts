@@ -21,7 +21,7 @@ export async function apiRequest(path: string, init?: RequestInit) {
   return response
 }
 
-export async function submitApi(path: string, method: 'POST' | 'PATCH', body?: object) {
+export async function submitApi(path: string, method: 'POST' | 'PATCH' | 'DELETE', body?: object) {
   const csrfResponse = await apiRequest('auth/csrf')
   const { csrfToken } = (await csrfResponse.json()).data
   const headers = new Headers({ 'X-CSRF-Token': csrfToken })
