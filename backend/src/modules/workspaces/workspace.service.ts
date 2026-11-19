@@ -1,3 +1,4 @@
+import type { ClientSession } from 'mongoose'
 import { ApiError } from '../../shared/api-error.js'
 import { publicWorkspace } from './workspace.model.js'
 import type { WorkspaceRepository } from './workspace.repository.js'
@@ -8,8 +9,8 @@ function workspaceNotFound() {
 }
 
 export function workspaceService(repository: WorkspaceRepository) {
-  async function requireMembership(workspaceId: string, userId: string) {
-    const membership = await repository.findMembership(workspaceId, userId)
+  async function requireMembership(workspaceId: string, userId: string, session?: ClientSession) {
+    const membership = await repository.findMembership(workspaceId, userId, session)
     if (!membership) throw workspaceNotFound()
     return membership
   }
@@ -25,9 +26,9 @@ export function workspaceService(repository: WorkspaceRepository) {
       return memberships.map(({ workspace, role }) => publicWorkspace(workspace, role))
     },
 
-    async details(userId: string, workspaceId: string) {
-      const { role } = await requireMembership(workspaceId, userId)
-      const workspace = await repository.findWorkspace(workspaceId)
+    async details(userId: string, workspaceId: string, session?: ClientSession) {
+      const { role } = await requireMembership(workspaceId, userId, session)
+      const workspace = await repository.findWorkspace(workspaceId, session)
       if (!workspace) throw workspaceNotFound()
       return publicWorkspace(workspace, role)
     },

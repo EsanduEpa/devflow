@@ -9,7 +9,7 @@ import { projectController } from './project.controller.js'
 import { projectMemberModel } from './project-member.model.js'
 import { projectModel } from './project.model.js'
 import { projectRepository } from './project.repository.js'
-import { projectCreateSchema, projectDetailsSchema, projectListSchema } from './project.schemas.js'
+import { projectCreateSchema, projectDetailsSchema, projectListSchema, projectMemberAddSchema, projectMemberRemoveSchema, projectUpdateSchema } from './project.schemas.js'
 import { projectService } from './project.service.js'
 
 export type ProjectCollections = { projects: string; members: string }
@@ -39,6 +39,10 @@ export async function createProjectRoutes(
 
   const projectDetails = Router()
   projectDetails.get('/:id', noStore, requireUser, validateRequest(projectDetailsSchema), controller.details)
+  projectDetails.patch('/:id', noStore, requireUser, verifyCsrf, validateRequest(projectUpdateSchema), controller.update)
+  projectDetails.get('/:id/members', noStore, requireUser, validateRequest(projectDetailsSchema), controller.listMembers)
+  projectDetails.post('/:id/members', noStore, requireUser, verifyCsrf, validateRequest(projectMemberAddSchema), controller.addMember)
+  projectDetails.delete('/:id/members/:userId', noStore, requireUser, verifyCsrf, validateRequest(projectMemberRemoveSchema), controller.removeMember)
 
   return { workspaceProjects, projectDetails }
 }

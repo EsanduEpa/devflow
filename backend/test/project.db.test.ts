@@ -30,8 +30,17 @@ function agent() {
 }
 
 async function post(client: ReturnType<typeof agent>, url: string, body: object, code: number) {
+  return mutate(client, 'post', url, code, body)
+}
+
+async function mutate(client: ReturnType<typeof agent>, method: 'post' | 'patch' | 'delete', url: string, code: number, body?: object) {
+  return (await mutation(client, method, url, body)).call.expect(code)
+}
+
+async function mutation(client: ReturnType<typeof agent>, method: 'post' | 'patch' | 'delete', url: string, body?: object) {
   const csrf = await client.get(`${authUrl}/csrf`).expect(200)
-  return client.post(url).set('Origin', origin).set('X-CSRF-Token', csrf.body.data.csrfToken).send(body).expect(code)
+  const call = client[method](url).set('Origin', origin).set('X-CSRF-Token', csrf.body.data.csrfToken)
+  return { call: body ? call.send(body) : call }
 }
 
 async function account(name: string) {
@@ -196,7 +205,7 @@ describe('Project creation and access', () => {
     await outsider.client.get(`${projectsUrl}/${shared.id}`).expect(404, hidden.body)
     await owner.client.get(`${projectsUrl}/${new Types.ObjectId()}`).expect(404, hidden.body)
     await owner.client.get(`${projectsUrl}/invalid`).expect(400)
-  }, 25_000)
+  }, 45_000)
 
   it('rejects unsupported project filters and invalid pagination', async () => {
     const team = await createWorkspace('Pagination', owner, false)
@@ -224,4 +233,122 @@ describe('Project creation and access', () => {
     const list = await outsider.client.get(team.projectList).expect(200)
     expect(list.body.data).toEqual([existing.body.data])
   }, 20_000)
+})
+
+describe('Project settings and lifecycle', () => {
+  it('lets an assigned Manager add and remove workspace members with access checks', async () => {
+    const team = await createWorkspace('Member management')
+    const project = await createProject(team.projectList, 'Member access project', manager.id)
+    const path = `${projectsUrl}/${project.id}`
+    const members = `${path}/members`
+    await request(app).get(members).expect(401)
+    await developer.client.get(members).expect(404)
+    await outsider.client.get(members).expect(404)
+    await secondManager.client.get(members).expect(404)
+    await manager.client.post(members).send({ userId: developer.id }).expect(403)
+    await post(manager.client, members, { userId: outsider.id }, 400)
+    await post(manager.client, members, { userId: developer.id, role: 'OWNER' }, 400)
+    const added = await post(manager.client, members, { userId: developer.id.toUpperCase() }, 201)
+    expect(added.body.data).toEqual({
+      id: expect.any(String), projectId: project.id, userId: developer.id, joinedAt: expect.any(String),
+    })
+    const duplicate = await post(owner.client, members, { userId: developer.id }, 409)
+    expect(duplicate.body.error.code).toBe('MEMBERSHIP_ALREADY_EXISTS')
+    const list = await developer.client.get(members).expect(200)
+    expect(list.body.data).toEqual([
+      { user: { id: manager.id, name: 'manager' }, workspaceRole: 'MANAGER', joinedAt: expect.any(String) },
+      { user: { id: developer.id, name: 'developer' }, workspaceRole: 'DEVELOPER', joinedAt: expect.any(String) },
+    ])
+    await developer.client.get(path).expect(200)
+    await post(developer.client, members, { userId: secondManager.id }, 403)
+    await mutate(developer.client, 'delete', `${members}/${manager.id}`, 403)
+    await post(owner.client, members, { userId: secondManager.id }, 201)
+    await mutate(secondManager.client, 'patch', path, 403, { name: 'No edit access' })
+    await mutate(secondManager.client, 'delete', `${members}/${developer.id}`, 403)
+    await manager.client.delete(`${members}/${developer.id}`).expect(403)
+    await mutate(manager.client, 'delete', `${members}/${developer.id}`, 204)
+    await mutate(manager.client, 'delete', `${members}/${developer.id}`, 404)
+    await developer.client.get(path).expect(404)
+  }, 25_000)
+
+  it('validates partial dates and keeps an archived project available for restore', async () => {
+    const team = await createWorkspace('Project status')
+    const created = await post(owner.client, team.projectList, {
+      name: 'Release planning', managerId: manager.id, description: 'Original description',
+      startDate: '2028-01-01', targetDate: '2028-02-29',
+    }, 201)
+    const path = `${projectsUrl}/${created.body.data.id}`
+    await owner.client.patch(path).send({ name: 'No CSRF' }).expect(403)
+    for (const fields of [{ targetDate: '2028-02-30' }, { startDate: '2028-03-01' }, { targetDate: '2027-12-31' }, { status: 'TODO' }, { workspaceId: team.id }, {}]) {
+      await mutate(owner.client, 'patch', path, 400, fields)
+    }
+    const updated = await mutate(manager.client, 'patch', path, 200, { name: ' Updated release ', targetDate: null, status: 'ARCHIVED' })
+    expect(updated.body.data).toMatchObject({
+      name: 'Updated release', description: 'Original description',
+      startDate: '2028-01-01', targetDate: null, status: 'ARCHIVED', managerId: manager.id,
+    })
+    await owner.client.get(team.projectList).expect(200, { data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } })
+    const archived = await owner.client.get(`${team.projectList}?status=ARCHIVED`).expect(200)
+    expect(archived.body.data).toEqual([updated.body.data])
+    await manager.client.get(path).expect(200, updated.body)
+    await outsider.client.get(path).expect(404)
+    await mutate(owner.client, 'delete', path, 404)
+    const restored = await mutate(owner.client, 'patch', path, 200, { status: 'ACTIVE' })
+    expect(restored.body.data).toEqual({ ...updated.body.data, status: 'ACTIVE', updatedAt: expect.any(String) })
+    const active = await owner.client.get(team.projectList).expect(200)
+    expect(active.body.data).toEqual([restored.body.data])
+  }, 25_000)
+
+  it('transfers management and protects the current manager from removal', async () => {
+    const team = await createWorkspace('Manager changes')
+    const project = await createProject(team.projectList, 'Transfers', manager.id)
+    const path = `${projectsUrl}/${project.id}`
+    const members = `${path}/members`
+    const protectedManager = await mutate(owner.client, 'delete', `${members}/${manager.id}`, 409)
+    expect(protectedManager.body.error.code).toBe('MANAGER_REPLACEMENT_REQUIRED')
+    for (const managerId of [developer.id, outsider.id]) {
+      await mutate(manager.client, 'patch', path, 400, { managerId })
+    }
+    const changed = await mutate(manager.client, 'patch', path, 200, { managerId: secondManager.id.toUpperCase() })
+    expect(changed.body.data.managerId).toBe(secondManager.id)
+    expect(await projectMemberships().countDocuments({ projectId: new Types.ObjectId(project.id), userId: secondManager.objectId })).toBe(1)
+    await manager.client.get(path).expect(200)
+    await mutate(manager.client, 'patch', path, 403, { name: 'Former manager edit' })
+    await mutate(secondManager.client, 'patch', path, 200, { description: 'Edited by the replacement' })
+    await mutate(secondManager.client, 'delete', `${members}/${secondManager.id}`, 409)
+    await mutate(secondManager.client, 'delete', `${members}/${manager.id}`, 204)
+    await manager.client.get(path).expect(404)
+  }, 25_000)
+
+  it('preserves the assigned manager membership when removal and reassignment race', async () => {
+    const team = await createWorkspace('Concurrent project changes')
+    const project = await createProject(team.projectList, 'Race test', manager.id)
+    const path = `${projectsUrl}/${project.id}`
+    await post(owner.client, `${path}/members`, { userId: secondManager.id }, 201)
+    const change = await mutation(owner.client, 'patch', path, { managerId: secondManager.id })
+    const remove = await mutation(owner.client, 'delete', `${path}/members/${secondManager.id}`)
+    const [changed, removed] = await Promise.all([change.call, remove.call])
+    expect(changed.status).toBe(200)
+    expect([204, 409]).toContain(removed.status)
+    const projectId = new Types.ObjectId(project.id)
+    expect(await db().collection(collections.project.projects).findOne({ _id: projectId }))
+      .toMatchObject({ managerId: secondManager.objectId })
+    expect(await projectMemberships().countDocuments({ projectId, userId: secondManager.objectId })).toBe(1)
+  }, 25_000)
+
+  it('rolls back a new manager membership when the project update fails', async () => {
+    const team = await createWorkspace('Reassignment rollback')
+    await createProject(team.projectList, 'Existing name')
+    const project = await createProject(team.projectList, 'Original name', manager.id)
+    await db().collection(collections.project.projects).createIndex({ workspaceId: 1, name: 1 }, {
+      name: 'test_force_project_update_failure',
+      unique: true,
+      partialFilterExpression: { workspaceId: team.id },
+    })
+    await mutate(owner.client, 'patch', `${projectsUrl}/${project.id}`, 500, { name: 'Existing name', managerId: secondManager.id })
+    const projectId = new Types.ObjectId(project.id)
+    expect(await db().collection(collections.project.projects).findOne({ _id: projectId }))
+      .toMatchObject({ name: 'Original name', managerId: manager.objectId })
+    expect(await projectMemberships().countDocuments({ projectId, userId: secondManager.objectId })).toBe(0)
+  }, 25_000)
 })

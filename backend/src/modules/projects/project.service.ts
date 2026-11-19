@@ -1,14 +1,46 @@
+import { mongo, type ClientSession } from 'mongoose'
 import { ApiError } from '../../shared/api-error.js'
 import type { WorkspaceService } from '../workspaces/workspace.service.js'
-import { publicProject } from './project.model.js'
+import { publicProject, type ProjectRecord } from './project.model.js'
 import type { ProjectRepository } from './project.repository.js'
-import type { ProjectCreateInput, ProjectListInput } from './project.schemas.js'
+import type { ProjectCreateInput, ProjectListInput, ProjectUpdateInput } from './project.schemas.js'
 
 function projectNotFound() {
   return new ApiError(404, 'NOT_FOUND', 'The project was not found.')
 }
 
 export function projectService(repository: ProjectRepository, workspaces: WorkspaceService) {
+  async function requireAccess(userId: string, id: string, session?: ClientSession) {
+    const project = await repository.find(id, session)
+    if (!project) throw projectNotFound()
+
+    const { myRole } = await workspaces.details(userId, project.workspaceId.toString(), session).catch((error: unknown) => {
+      if (error instanceof ApiError && error.status === 404) throw projectNotFound()
+      throw error
+    })
+    const canManage = myRole === 'OWNER' || (myRole === 'MANAGER' && project.managerId.toString() === userId)
+    if (!canManage && !await repository.hasMembership(id, userId, session)) throw projectNotFound()
+    return { project, canManage }
+  }
+
+  function manage<T>(userId: string, id: string, operation: (project: ProjectRecord, session: ClientSession) => Promise<T>) {
+    return repository.transaction(async (session) => {
+      const { project, canManage } = await requireAccess(userId, id, session)
+      if (!canManage) throw new ApiError(403, 'FORBIDDEN', 'Only the workspace owner or assigned project manager can manage this project.')
+      const lock = await repository.lockForManagement(id, session)
+      if (!lock.matchedCount) throw projectNotFound()
+      return operation(project, session)
+    })
+  }
+
+  async function validateManager(workspaceId: string, managerId: string, session?: ClientSession) {
+    if (!await repository.findEligibleManager(workspaceId, managerId, session)) {
+      throw new ApiError(400, 'VALIDATION_ERROR', 'Choose an owner or manager from this workspace.', [
+        { field: 'body.managerId', message: 'Choose an owner or manager from this workspace.' },
+      ])
+    }
+  }
+
   return {
     async create(userId: string, workspaceId: string, fields: ProjectCreateInput['body']) {
       const { myRole } = await workspaces.details(userId, workspaceId)
@@ -18,11 +50,7 @@ export function projectService(repository: ProjectRepository, workspaces: Worksp
       if (myRole === 'MANAGER' && fields.managerId !== userId) {
         throw new ApiError(403, 'FORBIDDEN', 'When you create a project as a workspace manager, you must assign yourself.')
       }
-      if (!await repository.findEligibleManager(workspaceId, fields.managerId)) {
-        throw new ApiError(400, 'VALIDATION_ERROR', 'Choose an owner or manager from this workspace.', [
-          { field: 'body.managerId', message: 'Choose an owner or manager from this workspace.' },
-        ])
-      }
+      await validateManager(workspaceId, fields.managerId)
       return publicProject(await repository.create(workspaceId, fields))
     },
 
@@ -36,17 +64,59 @@ export function projectService(repository: ProjectRepository, workspaces: Worksp
     },
 
     async details(userId: string, id: string) {
-      const project = await repository.find(id)
-      if (!project) throw projectNotFound()
-      const { myRole } = await workspaces.details(userId, project.workspaceId.toString()).catch((error: unknown) => {
-        if (error instanceof ApiError && error.status === 404) throw projectNotFound()
+      const { project } = await requireAccess(userId, id)
+      return publicProject(project)
+    },
+
+    update(userId: string, id: string, fields: ProjectUpdateInput['body']) {
+      return manage(userId, id, async (project, session) => {
+        const current = publicProject(project)
+        const startDate = fields.startDate === undefined ? current.startDate : fields.startDate
+        const targetDate = fields.targetDate === undefined ? current.targetDate : fields.targetDate
+        if (startDate && targetDate && targetDate < startDate) {
+          const message = 'Target date cannot be earlier than the start date.'
+          throw new ApiError(400, 'VALIDATION_ERROR', message, [{ field: 'body.targetDate', message }])
+        }
+        if (fields.managerId !== undefined) {
+          await validateManager(current.workspaceId, fields.managerId, session)
+          await repository.ensureMember(id, fields.managerId, session)
+        }
+        const updated = await repository.update(id, fields, session)
+        if (!updated) throw projectNotFound()
+        return publicProject(updated)
+      })
+    },
+
+    async listMembers(userId: string, id: string) {
+      const { project } = await requireAccess(userId, id)
+      return repository.listMembers(project)
+    },
+
+    addMember(userId: string, id: string, memberId: string) {
+      return manage(userId, id, async (project, session) => {
+        if (!await repository.isWorkspaceMember(project.workspaceId, memberId, session)) {
+          const message = 'Choose someone from this workspace.'
+          throw new ApiError(400, 'VALIDATION_ERROR', message, [{ field: 'body.userId', message }])
+        }
+        const member = await repository.addMember(id, memberId, session)
+        return { id: member._id.toString(), projectId: id, userId: memberId, joinedAt: member.joinedAt }
+      }).catch((error: unknown) => {
+        if (error instanceof mongo.MongoServerError && error.code === 11000) {
+          throw new ApiError(409, 'MEMBERSHIP_ALREADY_EXISTS', 'This person already belongs to the project.')
+        }
         throw error
       })
-      if (myRole === 'OWNER' || (myRole === 'MANAGER' && project.managerId.toString() === userId)) {
-        return publicProject(project)
-      }
-      if (!await repository.hasMembership(id, userId)) throw projectNotFound()
-      return publicProject(project)
+    },
+
+    removeMember(userId: string, id: string, memberId: string) {
+      return manage(userId, id, async (project, session) => {
+        if (project.managerId.toString() === memberId) {
+          throw new ApiError(409, 'MANAGER_REPLACEMENT_REQUIRED', 'Assign a new project manager before removing this member.')
+        }
+        const result = await repository.removeMember(id, memberId, session)
+        if (!result.deletedCount) throw new ApiError(404, 'NOT_FOUND', 'This person is not a member of the project.')
+        // M10 will unassign this member's tasks in the same transaction.
+      })
     },
   }
 }
