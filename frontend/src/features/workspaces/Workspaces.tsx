@@ -138,6 +138,7 @@ function WorkspacePage({ userId, workspaces, settings = false }: { userId: strin
         <>
           <Link className={`text-sm ${linkClass}`} to={workspaceUrl(workspace.id)}>Back to workspace</Link>
           <WorkspaceSettings key={workspace.id} userId={userId} workspace={workspace} />
+          {workspace.myRole === 'OWNER' && <WorkspaceMembers key={`members:${workspace.id}`} userId={userId} workspaceId={workspace.id} canManage />}
           {workspace.myRole === 'OWNER' && <WorkspaceInvitations key={`invites:${workspace.id}`} userId={userId} workspaceId={workspace.id} />}
         </>
       ) : (

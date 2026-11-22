@@ -11,6 +11,7 @@ function dateAtUtcMidnight(value: string | null) {
 
 type ProjectPage = { items: ProjectRecord[]; count: { total: number }[] }
 type ProjectMemberSummary = { user: { id: string; name: string }; workspaceRole: WorkspaceRole; joinedAt: Date }
+export type ProjectModels = { projects: ReturnType<typeof projectModel>; members: ReturnType<typeof projectMemberModel> }
 
 export function projectRepository(
   projects: ReturnType<typeof projectModel>,
@@ -19,14 +20,12 @@ export function projectRepository(
   users: ReturnType<typeof userModel>,
 ) {
   return {
-    create(workspaceId: string, { startDate, targetDate, ...fields }: ProjectCreateInput['body']) {
-      return projects.db.transaction(async (session) => {
-        const project = await new projects({
-          ...fields, workspaceId, startDate: dateAtUtcMidnight(startDate), targetDate: dateAtUtcMidnight(targetDate),
-        }).save({ session })
-        await new projectMembers({ projectId: project._id, userId: project.managerId }).save({ session })
-        return project
-      })
+    async create(workspaceId: string, { startDate, targetDate, ...fields }: ProjectCreateInput['body'], session: ClientSession) {
+      const project = await new projects({
+        ...fields, workspaceId, startDate: dateAtUtcMidnight(startDate), targetDate: dateAtUtcMidnight(targetDate),
+      }).save({ session })
+      await new projectMembers({ projectId: project._id, userId: project.managerId }).save({ session })
+      return project
     },
 
     async findEligibleManager(workspaceId: string, userId: string, session?: ClientSession) {
@@ -76,11 +75,6 @@ export function projectRepository(
 
     transaction<T>(operation: (session: ClientSession) => Promise<T>) {
       return projects.db.transaction(operation)
-    },
-
-    lockForManagement(id: string, session: ClientSession) {
-      // Reassignment and membership changes must write the same project document to serialize them.
-      return projects.updateOne({ _id: id }, { $inc: { __v: 1 } }, { session, timestamps: false }).exec()
     },
 
     update(id: string, { startDate, targetDate, ...fields }: ProjectUpdateInput['body'], session: ClientSession) {

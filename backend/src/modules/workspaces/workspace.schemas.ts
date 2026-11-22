@@ -20,7 +20,16 @@ export const workspaceUpdateSchema = z.object({
   }),
 })
 
+const normalId = objectId.transform((value) => value.toLowerCase())
+const memberParams = z.strictObject({ id: normalId, userId: normalId })
+export const workspaceMemberRemoveSchema = z.object({ query: emptyQuery, params: memberParams })
+export const workspaceMemberRoleSchema = workspaceMemberRemoveSchema.extend({
+  body: z.strictObject({ role: z.enum(['MANAGER', 'DEVELOPER']) }),
+})
+
 export type WorkspaceListInput = z.infer<typeof workspaceListSchema>
 export type WorkspaceDetailsInput = z.infer<typeof workspaceDetailsSchema>
 export type WorkspaceCreateInput = z.infer<typeof workspaceCreateSchema>
 export type WorkspaceUpdateInput = z.infer<typeof workspaceUpdateSchema>
+export type WorkspaceMemberRoleInput = z.infer<typeof workspaceMemberRoleSchema>
+export type WorkspaceMemberRemoveInput = z.infer<typeof workspaceMemberRemoveSchema>

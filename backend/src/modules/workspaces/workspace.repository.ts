@@ -1,4 +1,5 @@
 import { Types, type ClientSession } from 'mongoose'
+import type { ProjectModels } from '../projects/project.repository.js'
 import type { userModel } from '../users/user.model.js'
 import type { WorkspaceRecord, workspaceModel } from './workspace.model.js'
 import type { WorkspaceRole, workspaceMemberModel } from './workspace-member.model.js'
@@ -15,6 +16,7 @@ export function workspaceRepository(
   workspaces: ReturnType<typeof workspaceModel>,
   members: ReturnType<typeof workspaceMemberModel>,
   users: ReturnType<typeof userModel>,
+  projectModels: ProjectModels,
 ) {
   return {
     create(userId: string, fields: WorkspaceCreateInput['body']) {
@@ -66,6 +68,53 @@ export function workspaceRepository(
           },
         },
       ]).exec()
+    },
+
+    transaction<T>(operation: (session: ClientSession) => Promise<T>) {
+      return workspaces.db.transaction(operation)
+    },
+
+    lockMemberships(workspaceId: string, session: ClientSession) {
+      // Project writes and workspace membership changes share a write lock on this record.
+      return workspaces.updateOne({ _id: workspaceId }, { $inc: { __v: 1 } }, { session, timestamps: false }).exec()
+    },
+
+    findManagedProject(workspaceId: string, userId: string, session: ClientSession) {
+      return projectModels.projects.findOne({ workspaceId, managerId: userId }).select('name').session(session).lean().exec()
+    },
+
+    async updateMemberRole(workspaceId: string, userId: string, role: Exclude<WorkspaceRole, 'OWNER'>, session: ClientSession) {
+      const user = await users.findById(userId).select('name email').session(session).lean().exec()
+      if (!user) return null
+      const membership = await members.findOneAndUpdate(
+        { workspaceId, userId, role: { $ne: 'OWNER' } },
+        { $set: { role } },
+        { session, returnDocument: 'after', runValidators: true },
+      ).lean().exec()
+      if (!membership) return null
+      return { user: { id: user._id.toString(), name: user.name, email: user.email }, role: membership.role, joinedAt: membership.joinedAt }
+    },
+
+    async removeProjectMemberships(workspaceId: string, userId: string, session: ClientSession) {
+      const memberships = await projectModels.members.aggregate<{ projectId: Types.ObjectId }>([
+        { $match: { userId: new Types.ObjectId(userId) } },
+        { $lookup: {
+          from: projectModels.projects.collection.name, localField: 'projectId', foreignField: '_id',
+          pipeline: [{ $match: { workspaceId: new Types.ObjectId(workspaceId) } }, { $project: { _id: 1 } }],
+          as: 'project',
+        } },
+        { $match: { 'project.0': { $exists: true } } },
+        { $project: { _id: 0, projectId: 1 } },
+      ]).session(session).exec()
+      if (memberships.length) {
+        await projectModels.members.deleteMany({
+          userId, projectId: { $in: memberships.map(({ projectId }) => projectId) },
+        }, { session }).exec()
+      }
+    },
+
+    removeWorkspaceMember(workspaceId: string, userId: string, session: ClientSession) {
+      return members.deleteOne({ workspaceId, userId, role: { $ne: 'OWNER' } }, { session }).exec()
     },
 
     findWorkspace(id: string, session?: ClientSession) {
