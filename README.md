@@ -152,6 +152,23 @@ npm --prefix backend run test:db
 
 The tests use `devflow_test` and require a transaction-capable MongoDB deployment. Give your configured database user read and write access to `devflow_test`, or set `MONGODB_TEST_URI` in `backend/.env` to use separate test credentials. Each run creates and removes its own temporary collections. The password recovery tests use a temporary local inbox, so they run without Mailpit or real email credentials.
 
+## Run the Stage 1 browser and performance checks
+
+Install Playwright’s Chromium browser once, then run the browser suite from the repository root. The suite builds the frontend and starts its own local server. Use `npm --prefix backend run test:e2e -- --headed` to watch the browser.
+
+```sh
+npm --prefix backend exec -- playwright install chromium
+npm --prefix backend run test:e2e
+```
+
+Run the API timing and MongoDB query plan checks separately.
+
+```sh
+npm --prefix backend run test:performance
+```
+
+Both commands use temporary collections in `devflow_test`. See the [Stage 1 verification notes](docs/engineering-notes/006-stage1-verification.md) for acceptance coverage and measured results.
+
 ## Progress
 
-M13 adds project dashboard statistics calculated from task records. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.
+M14 adds Stage 1 security and regression coverage, Playwright browser tests, and performance measurements. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.

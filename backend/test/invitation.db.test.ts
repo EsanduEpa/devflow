@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import mongoose, { Types } from 'mongoose'
 import request from 'supertest'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApi } from '../src/api.js'
 import { createApp } from '../src/app.js'
 import { authConfig } from '../src/config/auth.js'
@@ -214,4 +214,25 @@ describe('Workspace invitations', () => {
     })
     expect(await memberships().countDocuments({ workspaceId: team.id, userId })).toBe(1)
   }, 15_000)
+
+  it('rolls back the invitation claim if the workspace membership write fails', async () => {
+    const team = await workspace('Invitation rollback')
+    const invitation = await invite(team.invitations, outsiderEmail)
+    const memberQuery = { workspaceId: team.id, userId: new Types.ObjectId(outsider.userId) }
+    const inviteQuery = { _id: new Types.ObjectId(invitation.data.id) }
+    const saveMembership = vi.spyOn(mongoose.connection.model('WorkspaceMember').collection, 'insertOne')
+      .mockRejectedValueOnce(new Error('Intentional invitation membership write failure'))
+    try {
+      await submit(outsider.client, invitation.accept, 500)
+      expect(saveMembership).toHaveBeenCalledOnce()
+    } finally {
+      saveMembership.mockRestore()
+    }
+
+    expect(await records().findOne(inviteQuery)).toMatchObject({ status: 'PENDING', acceptedAt: null })
+    expect(await memberships().countDocuments(memberQuery)).toBe(0)
+    await submit(outsider.client, invitation.accept, 200)
+    expect(await records().findOne(inviteQuery)).toMatchObject({ status: 'ACCEPTED' })
+    expect(await memberships().countDocuments(memberQuery)).toBe(1)
+  }, 25_000)
 })
