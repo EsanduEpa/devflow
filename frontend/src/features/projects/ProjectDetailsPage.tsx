@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router'
 import { ApiError, apiErrorMessage } from '../../shared/api'
 import { formatDateOnly } from '../../shared/date-only'
 import { errorClass, linkClass } from '../../shared/form-styles'
+import { ProjectDashboard } from '../dashboard/ProjectDashboard'
 import { listWorkspaceMembers, workspaceKeys } from '../workspaces/api'
 import { getProject, projectKeys, type Project } from './api'
 import { projectStatusLabels } from './project-labels'
@@ -71,6 +72,7 @@ function ProjectOverview({ project, userId, settings }: { project: Project; user
           </div>
         </dl>
       </section>
+      <ProjectDashboard projectId={project.id} userId={userId} />
       <ProjectMembers key={project.id} project={project} userId={userId} />
     </div>
   )

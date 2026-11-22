@@ -3,6 +3,9 @@ import type { Connection } from 'mongoose'
 import type { AuthConfig } from './config/auth.js'
 import type { ResetEmailConfig } from './config/reset-email.js'
 import { createAuthModule, type AuthCollections } from './modules/auth/auth.routes.js'
+import { dashboardRepository } from './modules/dashboard/dashboard.repository.js'
+import { createDashboardRoutes } from './modules/dashboard/dashboard.routes.js'
+import { dashboardService } from './modules/dashboard/dashboard.service.js'
 import { projectMemberModel } from './modules/projects/project-member.model.js'
 import { projectModel } from './modules/projects/project.model.js'
 import { createProjectRoutes, type ProjectCollections } from './modules/projects/project.routes.js'
@@ -29,6 +32,7 @@ export async function createApi(
   const workspaces = await createWorkspaceRoutes(connection, auth, projectModels, taskStore, collections?.workspace)
   const projects = await createProjectRoutes(projectModels, auth, workspaces, taskStore)
   const taskRoutes = createTaskRoutes(taskService(taskStore, projects.service, workspaces.service), auth)
+  const dashboardRoutes = createDashboardRoutes(dashboardService(dashboardRepository(tasks), projects.service), auth.requireUser)
   const router = Router()
 
   router.use(auth.router)
@@ -36,6 +40,7 @@ export async function createApi(
   router.use('/workspaces', projects.workspaceProjects)
   router.use('/projects', projects.projectDetails)
   router.use('/projects', taskRoutes.projectTasks)
+  router.use('/projects', dashboardRoutes)
   router.use('/tasks', taskRoutes.tasks)
   router.use('/invitations', workspaces.invitationRouter)
   return router
