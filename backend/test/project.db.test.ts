@@ -106,6 +106,46 @@ afterAll(async () => {
   }
 }, 30_000)
 
+it('requires a valid CSRF token on every state-changing API route', async () => {
+  const id = new Types.ObjectId().toString()
+  const workspace = `${workspacesUrl}/${id}`
+  const project = `${projectsUrl}/${id}`
+  const task = `/api/v1/tasks/${id}`
+  const anonymous = agent()
+  const accountRoutes = ['register', 'login', 'logout', 'forgot-password', 'reset-password'] as const
+  const protectedRoutes = [
+    ['patch', '/api/v1/users/me'],
+    ['patch', '/api/v1/users/me/password'],
+    ['post', workspacesUrl],
+    ['patch', workspace],
+    ['patch', `${workspace}/members/${id}`],
+    ['delete', `${workspace}/members/${id}`],
+    ['post', `${workspace}/invitations`],
+    ['post', `/api/v1/invitations/${randomBytes(32).toString('base64url')}/accept`],
+    ['post', `${workspace}/projects`],
+    ['patch', project],
+    ['post', `${project}/members`],
+    ['delete', `${project}/members/${id}`],
+    ['post', `${project}/tasks`],
+    ['patch', task],
+    ['patch', `${task}/status`],
+    ['delete', task],
+  ] as const
+
+  await anonymous.get(`${authUrl}/csrf`).expect(200)
+  await owner.client.get(`${authUrl}/csrf`).expect(200)
+  const routes = [
+    ...accountRoutes.map((route) => [anonymous, 'post', `${authUrl}/${route}`] as const),
+    ...protectedRoutes.map(([method, url]) => [owner.client, method, url] as const),
+  ]
+  for (const [client, method, url] of routes) {
+    const missing = await client[method](url).set('Origin', origin).expect(403)
+    expect(missing.body.error.code, `${method} ${url}`).toBe('CSRF_TOKEN_INVALID')
+    const invalid = await client[method](url).set('Origin', origin).set('X-CSRF-Token', 'different-token').expect(403)
+    expect(invalid.body.error.code, `${method} ${url}`).toBe('CSRF_TOKEN_INVALID')
+  }
+}, 60_000)
+
 describe('Project creation and access', () => {
   it('validates dates and project fields, stores UTC dates, and creates the manager membership', async () => {
     const team = await createWorkspace('Date validation')

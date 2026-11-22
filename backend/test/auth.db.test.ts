@@ -114,7 +114,11 @@ describe('MongoDB-backed authentication', () => {
     const sessions = mongoose.connection.model('Session')
     const session = await sessions.findOne({ tokenHash }).orFail()
     expect(session.expiresAt.getTime() - session.createdAt.getTime()).toBe(7 * 86400000)
-    expect(result.body.data).not.toHaveProperty('passwordHash')
+    expect(result.body.data).toEqual({
+      id: expect.any(String), name: 'Alex Perera', email: credentials.email,
+      createdAt: expect.any(String), updatedAt: expect.any(String),
+    })
+    expect(result.text).not.toContain(raw)
 
     await request(app).get(`${path}/me`).set('Cookie', cookiePair).expect(200, result.body)
     await client.post(`${path}/logout`).set('Origin', origin).set('X-CSRF-Token', anonymousToken).expect(403)

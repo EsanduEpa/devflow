@@ -63,16 +63,14 @@ describe('DevFlow HTTP foundation', () => {
   })
 
   it.each([
-    [500, 'INTERNAL_ERROR', new Error('private error details')],
-    [503, 'SERVICE_UNAVAILABLE', new mongoose.mongo.MongoNetworkError('private connection details')],
-  ])('handles a rejected route with status %i', async (status, code, error) => {
+    [500, 'INTERNAL_ERROR', 'An unexpected error occurred.', new Error('passwordHash=fixture-hash token=fixture-token')],
+    [503, 'SERVICE_UNAVAILABLE', 'The database is temporarily unavailable.', new mongoose.mongo.MongoNetworkError('mongodb+srv://fixture:example@database.invalid/')],
+  ])('handles a rejected route with status %i without exposing sensitive details', async (status, code, message, error) => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {})
     const router = Router()
     router.get('/fail', async () => { throw error })
 
-    const response = await request(createApp(router)).get('/api/v1/fail').expect(status)
-    expect(response.body.error.code).toBe(code)
-    expect(response.text).not.toContain(error.message)
-    expect(log).toHaveBeenCalledWith('DevFlow API request failed', { method: 'GET', status, code })
+    await request(createApp(router)).get('/api/v1/fail').expect(status, { error: { code, message } })
+    expect(log.mock.calls).toEqual([['DevFlow API request failed', { method: 'GET', status, code }]])
   })
 })
