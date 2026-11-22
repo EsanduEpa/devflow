@@ -1,10 +1,10 @@
 import { z } from 'zod'
 import { objectId } from '../../shared/object-id.js'
+import { hasSafePageOffset, paginationFields } from '../../shared/pagination.js'
 import { projectStatuses } from './project.model.js'
 
 const id = objectId.transform((value) => value.toLowerCase())
 const params = z.strictObject({ id })
-const queryInteger = z.string().regex(/^\d+$/, 'Enter a positive whole number.').transform(Number).pipe(z.int().positive())
 const dateOnly = z.iso.date().nullable().default(null)
 const status = z.enum(projectStatuses)
 const name = z.string().trim().min(3).max(150)
@@ -30,9 +30,8 @@ export const projectListSchema = z.object({
   params,
   query: z.strictObject({
     status: status.optional(),
-    page: queryInteger.default(1),
-    limit: queryInteger.pipe(z.int().max(100)).default(20),
-  }).refine(({ page, limit }) => Number.isSafeInteger((page - 1) * limit), {
+    ...paginationFields,
+  }).refine(hasSafePageOffset, {
     path: ['page'],
     message: 'Page number is too large.',
   }),

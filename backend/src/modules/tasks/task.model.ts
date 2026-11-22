@@ -2,6 +2,7 @@ import { Schema, type Connection, type Types } from 'mongoose'
 
 export const taskPriorities = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const
 export const taskStatuses = ['BACKLOG', 'TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'] as const
+export type TaskStatus = typeof taskStatuses[number]
 
 const taskSchema = new Schema({
   projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, immutable: true },
@@ -16,6 +17,7 @@ const taskSchema = new Schema({
 }, { timestamps: true })
 
 taskSchema.index({ projectId: 1, status: 1 })
+taskSchema.index({ projectId: 1, createdAt: -1, _id: -1 })
 taskSchema.index({ projectId: 1, assigneeId: 1 })
 taskSchema.index({ projectId: 1, priority: 1 })
 taskSchema.index({ projectId: 1, dueDate: 1 })
@@ -25,14 +27,14 @@ export function taskModel(connection: Connection, collection = 'tasks') {
   return connection.model('Task', taskSchema, collection)
 }
 
-type TaskRecord = {
+export type TaskRecord = {
   _id: Types.ObjectId
   projectId: Types.ObjectId
   title: string
   description?: string | null
   assigneeId?: Types.ObjectId | null
   priority: typeof taskPriorities[number]
-  status: typeof taskStatuses[number]
+  status: TaskStatus
   dueDate?: Date | null
   createdBy: Types.ObjectId
   updatedBy?: Types.ObjectId | null
