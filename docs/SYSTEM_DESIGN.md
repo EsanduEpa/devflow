@@ -15,17 +15,24 @@ This means we will have one React frontend, one Express backend, and one MongoDB
 
 We will not introduce microservices, Redis, WebSockets, or background job systems during Stage 1.
 
-```text
-React + TypeScript Frontend
-Pages, forms, Kanban board, dashboards
-         ↕ HTTP / REST API / JSON
-Node.js + Express + TypeScript
-Authentication | Workspaces | Projects | Tasks | Dashboards | Permissions
-Controllers → Services → Repositories
-         ↕
-MongoDB + Mongoose
-Users, memberships, projects, tasks and sessions
+```mermaid
+flowchart LR
+    Browser["React and TypeScript<br/>React Router · Studio UI · TanStack Query"]
+    Proxy["Vite development server<br/>Proxies /api to Express"]
+    Middleware["Express routes and middleware<br/>Session · CSRF · Zod"]
+    Controller["Controllers<br/>HTTP responses"]
+    Services["Feature services<br/>Business rules and authorization"]
+    Repositories["Repositories<br/>Mongoose · queries · transactions"]
+    Mongo[("MongoDB<br/>Nine collections")]
+    SMTP["SMTP<br/>Password recovery"]
+
+    Browser -->|Same-origin REST and JSON| Proxy
+    Proxy --> Middleware
+    Middleware --> Controller --> Services --> Repositories --> Mongo
+    Services --> SMTP
 ```
+
+The implemented local request flow uses the Vite proxy above. Express exposes the same REST routes through a same-origin deployment. See the [implementation decisions](engineering-notes/007-mvp-decisions.md) for how permissions, database writes, and frontend refreshes fit together.
 
 ### Why this architecture?
 
