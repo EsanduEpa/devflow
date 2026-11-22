@@ -165,9 +165,12 @@ export function TaskBoardPage({ userId }: { userId: string }) {
           <Link to={`/projects/${project.data.id}`} className={`break-words text-sm ${linkClass}`}>{project.data.name}</Link>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">Task board</h1>
         </div>
-        {project.data.status !== 'ARCHIVED' && (
-          <Link to={`/projects/${project.data.id}/tasks/new`} className={createButton}>Create task</Link>
-        )}
+        <div className="flex flex-wrap items-center gap-4">
+          <Link to={`/projects/${project.data.id}/tasks`} className={`text-sm ${linkClass}`}>Task list</Link>
+          {project.data.status !== 'ARCHIVED' && (
+            <Link to={`/projects/${project.data.id}/tasks/new`} className={createButton}>Create task</Link>
+          )}
+        </div>
       </div>
       <Board project={project.data} tasks={tasks.data} userId={userId} />
     </div>

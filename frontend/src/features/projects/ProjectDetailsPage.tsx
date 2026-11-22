@@ -44,6 +44,7 @@ function ProjectOverview({ project, userId, settings }: { project: Project; user
           <Link to={`/workspaces/${project.workspaceId}`} className={`text-sm ${linkClass}`}>Back to workspace</Link>
           <div className="flex flex-wrap gap-3">
             <Link to={`/projects/${project.id}/board`} className={`text-sm ${linkClass}`}>Task board</Link>
+            <Link to={`/projects/${project.id}/tasks`} className={`text-sm ${linkClass}`}>Task list</Link>
             {project.status !== 'ARCHIVED' &&
               <Link to={`/projects/${project.id}/tasks/new`} className={`text-sm ${linkClass}`}>Create task</Link>}
             {canManage && <Link to={`/projects/${project.id}/settings`} className={`text-sm ${linkClass}`}>Project settings</Link>}

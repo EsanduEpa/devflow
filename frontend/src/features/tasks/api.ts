@@ -25,18 +25,20 @@ export type TaskChanges = Partial<Omit<TaskFields, 'status'>>
 
 export const taskKey = (userId: string, taskId: string) => ['tasks', userId, 'details', taskId] as const
 export const taskBoardKey = (userId: string, projectId: string) => ['tasks', userId, 'board', projectId] as const
+export const taskListKey = (userId: string, projectId: string, query: string) => ['tasks', userId, 'list', projectId, query] as const
 
-interface TaskPage {
+interface TaskListResult {
   data: Task[]
   pagination: { page: number; limit: number; total: number; totalPages: number }
 }
 
-export async function listBoardTasks(projectId: string, signal: AbortSignal) {
-  async function loadPage(page: number): Promise<TaskPage> {
-    const response = await apiRequest(`projects/${encodeURIComponent(projectId)}/tasks?page=${page}`, { signal })
-    return response.json()
-  }
+export async function listTaskPage(projectId: string, query: URLSearchParams, signal: AbortSignal): Promise<TaskListResult> {
+  const response = await apiRequest(`projects/${encodeURIComponent(projectId)}/tasks?${query}`, { signal })
+  return response.json()
+}
 
+export async function listBoardTasks(projectId: string, signal: AbortSignal) {
+  const loadPage = (page: number) => listTaskPage(projectId, new URLSearchParams({ page: String(page) }), signal)
   const first = await loadPage(1)
   const tasks = new Map(first.data.map((task) => [task.id, task]))
   for (let page = 2; page <= first.pagination.totalPages; page++) {

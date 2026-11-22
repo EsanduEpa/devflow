@@ -298,3 +298,77 @@ describe('Kanban task lists and status changes', () => {
     await mutate(developer.client, 'patch', route, 200, { status: 'IN_REVIEW' })
   }, 45_000)
 })
+
+describe('Task search and filters', () => {
+  it('searches title words or an exact ID without leaking results across projects and workspaces', async () => {
+    const current = await project(await workspace('Task search workspace'), 'Current tasks')
+    const elsewhere = await project(await workspace('Private search workspace'), 'Other workspace tasks', false)
+    const match = await createTask(current.url, { title: 'Release Checklist', description: 'Confirm the build.' })
+    const descriptionOnly = await createTask(current.url, { title: 'Other work', description: 'Release checklist' })
+    const otherMatch = await createTask(elsewhere.url, { title: 'Release Checklist' })
+    const route = `${current.url}/tasks`
+
+    const search = await developer.client.get(route).query({ search: '  RELEASE  ' }).expect(200)
+    expect(search.body).toEqual({ data: [match.data], pagination: { page: 1, limit: 20, total: 1, totalPages: 1 } })
+    const exact = await owner.client.get(route).query({ search: descriptionOnly.id.toUpperCase() }).expect(200)
+    expect(exact.body.data).toEqual([descriptionOnly.data])
+    const includesBlankSearch = await owner.client.get(route).query({ search: '   ' }).expect(200)
+    expect(includesBlankSearch.body.pagination.total).toBe(2)
+
+    for (const query of [{ search: 'leas' }, { search: '---' }, { search: otherMatch.id }, { search: match.id, status: 'DONE' }]) {
+      const excluded = await owner.client.get(route).query(query).expect(200)
+      expect(excluded.body).toEqual({ data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } })
+    }
+    await outsider.client.get(route).query({ search: match.id }).expect(404)
+    await developer.client.get(`${elsewhere.url}/tasks`).query({ search: 'Release' }).expect(404)
+  }, 45_000)
+
+  it('combines filters, validates query strings, and paginates a larger dataset with stable totals', async () => {
+    const team = await workspace('Larger task search workspace')
+    const boardProject = await project(team, 'Tasks to filter')
+    const otherProject = await project(team, 'Unrelated project')
+    const baseTime = Date.now()
+    function records(projectId: string, count: number) {
+      return Array.from({ length: count }, (_, index) => ({
+        _id: new Types.ObjectId(),
+        projectId: new Types.ObjectId(projectId),
+        title: `${index % 5 ? 'Release' : 'Maintenance'} task ${index}`,
+        status: index % 4 ? 'TODO' : 'DONE',
+        priority: index % 3 ? 'HIGH' : 'LOW',
+        assigneeId: index % 2 ? null : developer.objectId,
+        createdBy: owner.objectId,
+        createdAt: new Date(baseTime + Math.floor(index / 4)),
+        updatedAt: new Date(baseTime + Math.floor(index / 4)),
+      }))
+    }
+    const target = records(boardProject.id, 340)
+    await db().collection(collections.task.tasks).insertMany([...target, ...records(otherProject.id, 170)])
+    const route = `${boardProject.url}/tasks`
+    const filters = { status: 'TODO', priority: 'HIGH', assigneeId: 'unassigned', search: 'release', limit: 20 }
+    const expected = target.filter(({ title, status, priority, assigneeId }) =>
+      title.startsWith('Release') && status === 'TODO' && priority === 'HIGH' && assigneeId === null).reverse()
+    const totalPages = Math.ceil(expected.length / filters.limit)
+    expect(totalPages).toBeGreaterThan(1)
+    expect(expected.length % filters.limit).toBeGreaterThan(0)
+
+    const first = await developer.client.get(route).query(filters).expect(200)
+    expect(first.body.pagination).toEqual({ page: 1, limit: 20, total: expected.length, totalPages })
+    expect(first.body.data.map(({ id }: { id: string }) => id)).toEqual(expected.slice(0, 20).map(({ _id }) => _id.toString()))
+    const last = await developer.client.get(route).query({ ...filters, page: totalPages }).expect(200)
+    expect(last.body.data.map(({ id }: { id: string }) => id)).toEqual(expected.slice((totalPages - 1) * 20).map(({ _id }) => _id.toString()))
+    expect(last.body.pagination).toMatchObject({ page: totalPages, total: expected.length, totalPages })
+    const beyond = await developer.client.get(route).query({ ...filters, page: totalPages + 1 }).expect(200)
+    expect(beyond.body).toEqual({ data: [], pagination: { page: totalPages + 1, limit: 20, total: expected.length, totalPages } })
+    const assigned = await developer.client.get(route).query({ assigneeId: developer.id.toUpperCase(), limit: 100 }).expect(200)
+    expect(assigned.body.pagination.total).toBe(170)
+    expect(assigned.body.data).toHaveLength(100)
+    expect(assigned.body.data.every(({ assigneeId }: { assigneeId: string }) => assigneeId === developer.id)).toBe(true)
+
+    for (const query of [
+      'status=ACTIVE', 'priority=OTHER', 'assigneeId=missing', 'search=a&search=b',
+      'status=TODO&status=DONE', 'limit=101', 'page=-1', 'projectId=ignored', `search=${'x'.repeat(201)}`,
+    ]) {
+      await owner.client.get(`${route}?${query}`).expect(400)
+    }
+  }, 55_000)
+})
