@@ -1,5 +1,7 @@
 # DevFlow — Detailed Database Design
 
+The [MVP engineering decisions](engineering-notes/007-mvp-decisions.md#data-model-and-validation) summarize the nine implemented collections, their indexes, and the transaction boundaries used by the release.
+
 **Version 1.0 — Draft for Approval**
 
 This document defines the MongoDB database for the approved **DevFlow Stage 1 MVP**.

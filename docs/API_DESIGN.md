@@ -1,5 +1,7 @@
 # DevFlow — Detailed REST API Design Specification
 
+The [Stage 1 API reference](API_REFERENCE.md) lists the implemented request and response contracts for the MVP.
+
 **Project:** DevFlow  
 **Stage:** Stage 1 — Minimum Viable Product  
 **Document Version:** 1.0  
