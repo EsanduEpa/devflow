@@ -6,3 +6,5 @@ export const projectStatusLabels: Record<ProjectStatus, string> = {
   COMPLETED: 'Completed',
   ARCHIVED: 'Archived',
 }
+
+export const projectStatusTones = { PLANNED: 'neutral', ACTIVE: 'accent', COMPLETED: 'success', ARCHIVED: 'warning' } as const

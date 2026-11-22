@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Link, Navigate } from 'react-router'
 import { authErrorMessage, changePassword, updateProfile, type PublicUser } from '../auth/api'
-import { cardClass, errorClass, fieldClass, linkClass, submitClass, successClass } from '../../shared/form-styles'
+import { errorClass, fieldClass, submitClass, successClass } from '../../shared/form-styles'
+import { PageHeader } from '../../shared/ui'
+import { useFieldErrors } from '../../shared/useFieldErrors'
 
 function EditProfile({ user }: { user: PublicUser }) {
   const queryClient = useQueryClient()
@@ -10,17 +11,18 @@ function EditProfile({ user }: { user: PublicUser }) {
   const [email, setEmail] = useState(user.email)
   const [bio, setBio] = useState(user.profile?.bio ?? '')
   const [notice, setNotice] = useState('')
-  const [error, setError] = useState('')
+  const [error, setError] = useState<unknown>(null)
   const [pending, setPending] = useState(false)
   const emailChanged = email.trim().toLowerCase() !== user.email
   const nameChanged = name.trim() !== user.name
   const bioChanged = bio !== (user.profile?.bio ?? '')
+  const fields = useFieldErrors(error)
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (pending) return
     const data = new FormData(event.currentTarget)
-    setError('')
+    setError(null)
     setNotice('')
     setPending(true)
     try {
@@ -36,39 +38,43 @@ function EditProfile({ user }: { user: PublicUser }) {
       setBio(updated.profile?.bio ?? '')
       setNotice('Profile saved.')
     } catch (error) {
-      setError(authErrorMessage(error))
+      setError(error)
     } finally {
       setPending(false)
     }
   }
 
   return (
-    <section className={cardClass}>
-      <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Profile settings</h1>
-      <form onSubmit={save} className="mt-7">
+    <section className="ui-panel" aria-labelledby="profile-details">
+      <h2 id="profile-details" className="text-lg font-semibold">Profile details</h2>
+      <form onSubmit={save} className="mt-4">
         <fieldset disabled={pending} className="space-y-4">
           <label className="block text-sm font-medium">
             Full name
             <input className={fieldClass} value={name} onChange={(event) => setName(event.target.value)}
-              autoComplete="name" required minLength={2} maxLength={100} />
+              autoComplete="name" required minLength={2} maxLength={100} {...fields.props('name')} />
+            {fields.message('name')}
           </label>
           <label className="block text-sm font-medium">
             Email
             <input className={fieldClass} type="email" value={email} onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email" required />
+              autoComplete="email" required {...fields.props('email')} />
+            {fields.message('email')}
           </label>
           {emailChanged && (
             <label className="block text-sm font-medium">
               Current password to change your email
-              <input className={fieldClass} name="currentPassword" type="password" autoComplete="current-password" required maxLength={128} />
+              <input className={fieldClass} name="currentPassword" type="password" autoComplete="current-password" required maxLength={128} {...fields.props('currentPassword')} />
+              {fields.message('currentPassword')}
             </label>
           )}
           <label className="block text-sm font-medium">
             Bio
-            <textarea className={fieldClass} rows={3} maxLength={500} value={bio} onChange={(event) => setBio(event.target.value)} />
+            <textarea className={fieldClass} rows={3} maxLength={500} value={bio} onChange={(event) => setBio(event.target.value)} {...fields.props('profile.bio')} />
+            {fields.message('profile.bio')}
           </label>
           {notice && <p className={successClass} role="status">{notice}</p>}
-          {error && <p className={errorClass} role="alert">{error}</p>}
+          {error != null && <p className={errorClass} role="alert">{authErrorMessage(error)}</p>}
           <button className={submitClass} disabled={!nameChanged && !emailChanged && !bioChanged}>
             {pending ? 'Saving…' : 'Save profile'}
           </button>
@@ -79,42 +85,45 @@ function EditProfile({ user }: { user: PublicUser }) {
 }
 
 function ChangePasswordForm({ onChanged }: { onChanged: () => Promise<void> }) {
-  const [error, setError] = useState('')
+  const [error, setError] = useState<unknown>(null)
   const [pending, setPending] = useState(false)
+  const fields = useFieldErrors(error)
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (pending) return
     const data = new FormData(event.currentTarget)
-    setError('')
+    setError(null)
     setPending(true)
     try {
       await changePassword(String(data.get('currentPassword') ?? ''), String(data.get('newPassword') ?? ''))
       await onChanged()
     } catch (error) {
-      setError(authErrorMessage(error))
+      setError(error)
     } finally {
       setPending(false)
     }
   }
 
   return (
-    <section className={cardClass}>
-      <h2 className="text-xl font-semibold text-slate-950">Change password</h2>
-      <p className="mt-2 text-sm text-slate-700">Changing your password signs you out on all devices.</p>
+    <section className="ui-panel" aria-labelledby="change-password-title">
+      <h2 id="change-password-title" className="text-lg font-semibold">Change password</h2>
+      <p className="mt-2 text-sm text-secondary">Changing your password signs you out on all devices.</p>
       <form onSubmit={save} className="mt-5">
         <fieldset disabled={pending} className="space-y-4">
           <label className="block text-sm font-medium">
             Current password
-            <input className={fieldClass} name="currentPassword" type="password" autoComplete="current-password" required maxLength={128} />
+            <input className={fieldClass} name="currentPassword" type="password" autoComplete="current-password" required maxLength={128} {...fields.props('currentPassword')} />
+            {fields.message('currentPassword')}
           </label>
           <label className="block text-sm font-medium">
             New password
             <input className={fieldClass} name="newPassword" type="password" autoComplete="new-password" minLength={12}
-              maxLength={128} required aria-describedby="change-password-rules" />
+              maxLength={128} required {...fields.props('newPassword', 'change-password-rules')} />
+            {fields.message('newPassword')}
           </label>
-          <p id="change-password-rules" className="text-sm text-slate-600">Use 12 to 128 characters.</p>
-          {error && <p className={errorClass} role="alert">{error}</p>}
+          <p id="change-password-rules" className="text-sm text-secondary">Use 12 to 128 characters.</p>
+          {error != null && <p className={errorClass} role="alert">{authErrorMessage(error)}</p>}
           <button className={submitClass}>{pending ? 'Changing…' : 'Change password'}</button>
         </fieldset>
       </form>
@@ -122,26 +131,14 @@ function ChangePasswordForm({ onChanged }: { onChanged: () => Promise<void> }) {
   )
 }
 
-export function AccountSettings({ user }: { user: PublicUser | null }) {
-  const queryClient = useQueryClient()
-  const [updatedEmail, setUpdatedEmail] = useState<string | null>(null)
-
-  async function passwordChanged(email: string) {
-    await queryClient.cancelQueries({ queryKey: ['current-user'] })
-    setUpdatedEmail(email)
-    queryClient.setQueryData(['current-user'], null)
-  }
-
-  if (updatedEmail !== null) {
-    return <Navigate to="/login" replace state={{ passwordUpdated: true, email: updatedEmail }} />
-  }
-  if (!user) return <Navigate to="/login" replace />
-
+export function AccountSettings({ user, onPasswordChanged }: { user: PublicUser; onPasswordChanged: (email: string) => Promise<void> }) {
   return (
-    <div className="w-full max-w-md space-y-5">
-      <Link to="/" className={`text-sm ${linkClass}`}>Back to home</Link>
-      <EditProfile key={user.id} user={user} />
-      <ChangePasswordForm key={`password:${user.id}`} onChanged={() => passwordChanged(user.email)} />
+    <div className="w-full min-w-0 max-w-6xl space-y-5">
+      <PageHeader title="Profile settings" />
+      <div className="grid min-w-0 items-start gap-4 xl:grid-cols-2">
+        <EditProfile key={user.id} user={user} />
+        <ChangePasswordForm key={`password:${user.id}`} onChanged={() => onPasswordChanged(user.email)} />
+      </div>
     </div>
   )
 }

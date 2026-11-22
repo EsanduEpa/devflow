@@ -5,5 +5,5 @@ export function readInvitationToken(state: unknown) {
 }
 
 export function afterAuthentication(invitationToken?: string) {
-  return invitationToken ? `/invitations/${invitationToken}` : '/'
+  return invitationToken ? `/invitations/${invitationToken}` : '/workspaces'
 }

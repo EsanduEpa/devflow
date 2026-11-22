@@ -10,3 +10,6 @@ export const taskStatusLabels: Record<TaskStatus, string> = {
 }
 
 export const taskStatusOrder: TaskStatus[] = ['BACKLOG', 'TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE']
+
+export const taskPriorityTones = { LOW: 'neutral', MEDIUM: 'accent', HIGH: 'warning', URGENT: 'danger' } as const
+export const taskStatusTones = { BACKLOG: 'neutral', TODO: 'neutral', IN_PROGRESS: 'accent', IN_REVIEW: 'warning', DONE: 'success' } as const

@@ -1,8 +1,10 @@
 import { useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate, Route, Routes, useNavigate, useParams } from 'react-router'
+import { ArrowRight, Building2, ChevronLeft, Plus } from 'lucide-react'
 import { ApiError, apiErrorMessage } from '../../shared/api'
-import { errorClass, fieldClass, linkClass } from '../../shared/form-styles'
+import { errorClass } from '../../shared/form-styles'
+import { Badge, EmptyState, LoadingState, PageHeader } from '../../shared/ui'
 import { ProjectCreatePage } from '../projects/ProjectCreatePage'
 import { WorkspaceProjects } from '../projects/WorkspaceProjects'
 import { createWorkspace, getWorkspace, listWorkspaces, updateWorkspace, workspaceKeys, type Workspace } from './api'
@@ -11,22 +13,21 @@ import { WorkspaceInvitations } from './WorkspaceInvitations'
 import { WorkspaceMembers } from './WorkspaceMembers'
 import { roleLabels } from './workspace-labels'
 
-const panelClass = 'rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7'
-
-function workspaceUrl(workspaceId: string) {
-  return `/workspaces/${workspaceId}`
-}
-
-function WorkspaceList({ userId, query }: { userId: string; query: ReturnType<typeof useWorkspaceList> }) {
+function WorkspaceList({ userId }: { userId: string }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const dialog = useRef<HTMLDialogElement>(null)
+  const query = useQuery({
+    queryKey: workspaceKeys.list(userId), queryFn: ({ signal }) => listWorkspaces(signal), retry: false, gcTime: 0,
+  })
   const create = useMutation({
     mutationFn: createWorkspace,
     onSuccess: (workspace) => {
       dialog.current?.close()
+      queryClient.setQueryData<Workspace[]>(workspaceKeys.list(userId), (current) =>
+        current?.some(({ id }) => id === workspace.id) ? current : [...(current ?? []), workspace])
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.list(userId) })
-      if (dialog.current) void navigate(workspaceUrl(workspace.id))
+      void navigate(`/workspaces/${workspace.id}`)
     },
   })
 
@@ -37,41 +38,43 @@ function WorkspaceList({ userId, query }: { userId: string; query: ReturnType<ty
   }
 
   return (
-    <>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Workspaces</h1>
-        <button onClick={openDialog} className="rounded-lg bg-indigo-700 px-4 py-2.5 font-medium text-white hover:bg-indigo-800">
-          New workspace
-        </button>
-      </div>
-      {query.isPending ? <p role="status">Loading workspaces…</p> : query.isError ? (
-        <section className={panelClass}>
+    <div className="mx-auto w-full max-w-6xl space-y-5">
+      <PageHeader title="Workspaces" description="Open a workspace to manage its projects and team." actions={
+        <button onClick={openDialog} className="ui-button ui-primary"><Plus size={17} aria-hidden="true" />New workspace</button>
+      } />
+      {query.isPending ? <LoadingState>Loading workspaces…</LoadingState> : query.isError ? (
+        <section className="ui-panel">
           <p className={errorClass} role="alert">{apiErrorMessage(query.error)}</p>
-          <button onClick={() => void query.refetch()} className={`mt-3 ${linkClass}`}>Try again</button>
+          <button onClick={() => void query.refetch()} className="ui-button ui-secondary mt-3">Try again</button>
         </section>
       ) : query.data.length ? (
-        <ul className="grid gap-4 sm:grid-cols-2" aria-label="Your workspaces">
+        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Your workspaces">
           {query.data.map((workspace) => (
-            <li key={workspace.id}>
-              <Link to={workspaceUrl(workspace.id)} className={`block h-full hover:border-indigo-400 focus-visible:outline-indigo-600 ${panelClass}`}>
-                <h2 className="break-words text-lg font-semibold text-slate-950">{workspace.name}</h2>
-                <p className="mt-1 text-sm font-medium text-indigo-800">{roleLabels[workspace.myRole]}</p>
-                {workspace.description && <p className="mt-2 break-words text-sm text-slate-700">{workspace.description}</p>}
+            <li key={workspace.id} className="min-w-0">
+              <Link to={`/workspaces/${workspace.id}`} className="ui-panel group flex h-full min-w-0 flex-col gap-3 hover:border-accent">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="ui-icon-box"><Building2 size={18} aria-hidden="true" /></span>
+                  <ArrowRight size={16} className="text-secondary group-hover:text-accent-ink" aria-hidden="true" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="break-words text-base font-semibold">{workspace.name}</h2>
+                  {workspace.description && <p className="mt-1 line-clamp-2 break-words text-secondary">{workspace.description}</p>}
+                </div>
+                <div className="mt-auto"><Badge tone={workspace.myRole === 'OWNER' ? 'accent' : 'neutral'}>{roleLabels[workspace.myRole]}</Badge></div>
               </Link>
             </li>
           ))}
         </ul>
-      ) : <p className={panelClass}>You don’t belong to any workspaces yet. Create one to get started.</p>}
-      <dialog
-        ref={dialog}
-        aria-labelledby="create-workspace-title"
-        className={`m-auto w-11/12 max-w-lg backdrop:bg-slate-950/45 ${panelClass}`}
-        onCancel={(event) => { if (create.isPending) event.preventDefault() }}
-      >
-        <h2 id="create-workspace-title" className="text-xl font-semibold text-slate-950">Create a workspace</h2>
+      ) : <EmptyState icon={<Building2 size={18} aria-hidden="true" />} title="You don’t belong to any workspaces yet.">
+        Create a workspace to get started or open an invitation from your team.
+      </EmptyState>}
+      <dialog ref={dialog} aria-labelledby="create-workspace-title"
+        className="ui-panel fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto text-ink shadow-xl"
+        onCancel={(event) => { if (create.isPending) event.preventDefault() }}>
+        <h2 id="create-workspace-title" className="text-lg font-semibold">Create a workspace</h2>
         <WorkspaceForm onSubmit={create.mutate} onCancel={() => dialog.current?.close()} pending={create.isPending} error={create.error} />
       </dialog>
-    </>
+    </div>
   )
 }
 
@@ -87,37 +90,38 @@ function WorkspaceSettings({ userId, workspace }: { userId: string; workspace: W
   })
 
   return (
-    <section className={panelClass}>
-      <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Workspace settings</h1>
-      <p className="mt-2 break-words text-slate-700">{workspace.name}</p>
-      {workspace.myRole === 'OWNER' ? (
-        <WorkspaceForm initial={workspace} onSubmit={update.mutate} pending={update.isPending} error={update.error} saved={update.isSuccess} />
-      ) : <p className={`mt-4 ${errorClass}`} role="alert">Only the workspace owner can edit these settings.</p>}
-    </section>
+    <>
+      <section className="ui-panel" aria-labelledby="workspace-details">
+        <h2 className="text-lg font-semibold" id="workspace-details">Workspace details</h2>
+        {workspace.myRole === 'OWNER' ? (
+          <WorkspaceForm key={workspace.updatedAt} initial={workspace} onSubmit={update.mutate}
+            pending={update.isPending} error={update.error} saved={update.isSuccess} />
+        ) : <p className={`mt-4 ${errorClass}`} role="alert">Only the workspace owner can edit these settings.</p>}
+      </section>
+      {workspace.myRole === 'OWNER' && <>
+        <WorkspaceMembers key={`members:${workspace.id}`} userId={userId} workspaceId={workspace.id} canManage />
+        <WorkspaceInvitations key={`invites:${workspace.id}`} userId={userId} workspaceId={workspace.id} />
+      </>}
+    </>
   )
 }
 
-function WorkspacePage({ userId, workspaces, settings = false }: { userId: string; workspaces?: Workspace[]; settings?: boolean }) {
-  const { workspaceId = '' } = useParams()
-  const navigate = useNavigate()
+function WorkspacePage({ userId, view = 'overview' }: { userId: string; view?: 'overview' | 'projects' | 'members' | 'settings' }) {
+  const workspaceId = (useParams().workspaceId ?? '').toLowerCase()
   const query = useQuery({
     queryKey: workspaceKeys.details(userId, workspaceId),
-    queryFn: ({ signal }) => getWorkspace(workspaceId, signal),
-    retry: false,
-    gcTime: 0,
+    queryFn: ({ signal }) => getWorkspace(workspaceId, signal), retry: false, gcTime: 0,
   })
 
-  if (query.isPending) return <p role="status">Loading workspace…</p>
+  if (query.isPending) return <LoadingState>Loading workspace…</LoadingState>
   if (query.isError) {
     const status = query.error instanceof ApiError ? query.error.status : undefined
-    const message = status === 404
-      ? 'You don’t have access to this workspace. Check the link or choose a workspace from your list.'
-      : apiErrorMessage(query.error)
     return (
-      <section className={panelClass}>
-        <p className={errorClass} role="alert">{message}</p>
+      <section className="ui-panel max-w-xl">
+        <p className={errorClass} role="alert">{status === 404
+          ? 'You don’t have access to this workspace. Check the link or choose a workspace from your list.' : apiErrorMessage(query.error)}</p>
         {(status === undefined || status >= 500) && (
-          <button onClick={() => void query.refetch()} className={`mt-3 ${linkClass}`}>Try again</button>
+          <button onClick={() => void query.refetch()} className="ui-button ui-secondary mt-3">Try again</button>
         )}
       </section>
     )
@@ -125,69 +129,38 @@ function WorkspacePage({ userId, workspaces, settings = false }: { userId: strin
 
   const workspace = query.data
   return (
-    <>
-      {workspaces && workspaces.length > 1 && workspaces.some(({ id }) => id === workspace.id) && (
-        <label className="block max-w-xs text-sm font-medium">
-          Switch workspace
-          <select className={fieldClass} value={workspace.id} onChange={(event) => void navigate(workspaceUrl(event.target.value))}>
-            {workspaces.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
-          </select>
-        </label>
-      )}
-      {settings ? (
-        <>
-          <Link className={`text-sm ${linkClass}`} to={workspaceUrl(workspace.id)}>Back to workspace</Link>
-          <WorkspaceSettings key={workspace.id} userId={userId} workspace={workspace} />
-          {workspace.myRole === 'OWNER' && <WorkspaceMembers key={`members:${workspace.id}`} userId={userId} workspaceId={workspace.id} canManage />}
-          {workspace.myRole === 'OWNER' && <WorkspaceInvitations key={`invites:${workspace.id}`} userId={userId} workspaceId={workspace.id} />}
-        </>
-      ) : (
-        <>
-          <section className={panelClass}>
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="min-w-0">
-                <h1 className="break-words text-3xl font-semibold tracking-tight text-slate-950">{workspace.name}</h1>
-                <p className="mt-2 text-sm font-medium text-indigo-800">{roleLabels[workspace.myRole]}</p>
-              </div>
-              {workspace.myRole === 'OWNER' && (
-                <Link to={`${workspaceUrl(workspace.id)}/settings`} className={`text-sm ${linkClass}`}>Workspace settings</Link>
-              )}
-            </div>
-            {workspace.description && <p className="mt-4 break-words whitespace-pre-wrap text-slate-700">{workspace.description}</p>}
-          </section>
-          <WorkspaceProjects key={`projects:${workspace.id}`} workspace={workspace} userId={userId} />
-          <WorkspaceMembers userId={userId} workspaceId={workspace.id} />
-        </>
-      )}
-    </>
+    <div className="w-full min-w-0 max-w-6xl space-y-5">
+      {view === 'settings' ? <>
+        <Link className="ui-button ui-ghost -ml-3" to={`/workspaces/${workspace.id}`}><ChevronLeft size={16} aria-hidden="true" />Back to workspace</Link>
+        <PageHeader title="Workspace settings" description={workspace.name} />
+        {workspace.myRole === 'OWNER' && <nav aria-label="Settings sections" className="flex flex-wrap gap-2">
+          <a className="ui-button ui-secondary" href="#workspace-details">Details</a>
+          <a className="ui-button ui-secondary" href="#workspace-members">Members</a>
+          <a className="ui-button ui-secondary" href="#workspace-invitations">Invitations</a>
+        </nav>}
+        <WorkspaceSettings key={workspace.id} userId={userId} workspace={workspace} />
+      </> : view === 'members' ? <>
+        <PageHeader title="Workspace members" description={workspace.name} />
+        <WorkspaceMembers key={workspace.id} userId={userId} workspaceId={workspace.id} canManage={workspace.myRole === 'OWNER'} />
+      </> : <>
+        {view === 'overview' && <PageHeader title={workspace.name} description={workspace.description}
+          meta={<Badge tone="accent">{roleLabels[workspace.myRole]}</Badge>} />}
+        <WorkspaceProjects key={workspace.id} workspace={workspace} userId={userId} heading={view === 'projects'} />
+      </>}
+    </div>
   )
 }
 
-function useWorkspaceList(userId: string) {
-  return useQuery({
-    queryKey: workspaceKeys.list(userId),
-    queryFn: ({ signal }) => listWorkspaces(signal),
-    retry: false,
-    gcTime: 0,
-  })
-}
-
 export function Workspaces({ userId }: { userId: string }) {
-  const list = useWorkspaceList(userId)
-  const workspaces = list.isError ? undefined : list.data
   return (
-    <div className="w-full max-w-4xl space-y-5">
-      <nav className="flex gap-4 text-sm" aria-label="Workspace navigation">
-        <Link to="/" className={linkClass}>Home</Link>
-        <Link to="/workspaces" className={linkClass}>All workspaces</Link>
-      </nav>
-      <Routes>
-        <Route index element={<WorkspaceList userId={userId} query={list} />} />
-        <Route path=":workspaceId" element={<WorkspacePage userId={userId} workspaces={workspaces} />} />
-        <Route path=":workspaceId/settings" element={<WorkspacePage userId={userId} workspaces={workspaces} settings />} />
-        <Route path=":workspaceId/projects/new" element={<ProjectCreatePage userId={userId} />} />
-        <Route path="*" element={<Navigate to="/workspaces" replace />} />
-      </Routes>
-    </div>
+    <Routes>
+      <Route index element={<WorkspaceList userId={userId} />} />
+      <Route path=":workspaceId" element={<WorkspacePage userId={userId} />} />
+      <Route path=":workspaceId/projects" element={<WorkspacePage userId={userId} view="projects" />} />
+      <Route path=":workspaceId/settings" element={<WorkspacePage userId={userId} view="settings" />} />
+      <Route path=":workspaceId/members" element={<WorkspacePage userId={userId} view="members" />} />
+      <Route path=":workspaceId/projects/new" element={<ProjectCreatePage userId={userId} />} />
+      <Route path="*" element={<Navigate to="/workspaces" replace />} />
+    </Routes>
   )
 }
