@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
 import { ApiError, apiErrorMessage } from '../../shared/api'
+import { formatDateOnly } from '../../shared/date-only'
 import { errorClass, linkClass } from '../../shared/form-styles'
 import { listWorkspaceMembers, workspaceKeys } from '../workspaces/api'
 import { getProject, projectKeys, type Project } from './api'
-import { formatProjectDate, projectStatusLabels } from './project-labels'
+import { projectStatusLabels } from './project-labels'
 import { ProjectMembers } from './ProjectMembers'
 import { ProjectSettings } from './ProjectSettings'
 
@@ -41,7 +42,11 @@ function ProjectOverview({ project, userId, settings }: { project: Project; user
       <section className={panelClass}>
         <div className="flex flex-wrap justify-between gap-3">
           <Link to={`/workspaces/${project.workspaceId}`} className={`text-sm ${linkClass}`}>Back to workspace</Link>
-          {canManage && <Link to={`/projects/${project.id}/settings`} className={`text-sm ${linkClass}`}>Project settings</Link>}
+          <div className="flex flex-wrap gap-3">
+            {project.status !== 'ARCHIVED' &&
+              <Link to={`/projects/${project.id}/tasks/new`} className={`text-sm ${linkClass}`}>Create task</Link>}
+            {canManage && <Link to={`/projects/${project.id}/settings`} className={`text-sm ${linkClass}`}>Project settings</Link>}
+          </div>
         </div>
         <h1 className="mt-4 break-words text-3xl font-semibold tracking-tight text-slate-950">{project.name}</h1>
         {project.description && <p className="mt-4 break-words whitespace-pre-wrap text-slate-700">{project.description}</p>}
@@ -56,11 +61,11 @@ function ProjectOverview({ project, userId, settings }: { project: Project; user
           </div>
           <div>
             <dt className="font-medium">Start date</dt>
-            <dd className="mt-1 text-slate-700">{formatProjectDate(project.startDate)}</dd>
+            <dd className="mt-1 text-slate-700">{formatDateOnly(project.startDate)}</dd>
           </div>
           <div>
             <dt className="font-medium">Target date</dt>
-            <dd className="mt-1 text-slate-700">{formatProjectDate(project.targetDate)}</dd>
+            <dd className="mt-1 text-slate-700">{formatDateOnly(project.targetDate)}</dd>
           </div>
         </dl>
       </section>

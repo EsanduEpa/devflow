@@ -106,6 +106,13 @@ Set `PASSWORD_RESET_ORIGIN` in `backend/.env` if your browser uses a different f
 2. Assign that Manager to a project. Try changing their role back to **Developer**, then try removing them. Both actions should tell you to reassign their projects first.
 3. Assign the project to another eligible manager in **Project settings**. Return to **Workspace settings**, update the former Manager’s role, then select **Remove** and confirm. They should lose access to the workspace and its projects on their next request. Their access to other workspaces stays intact.
 
+## Test task management in the browser
+
+1. Open an active project as its Owner or assigned Manager. Choose **Create task**, select a project member as assignee, and save. Copy the task URL for the rest of the test.
+2. Use **Edit task** to change the priority or due date. Open the task URL as a Developer on the project to verify read access. A Developer can create a task by entering a title and description.
+3. Remove the assignee in **Project settings → Project members**, then refresh the task as Owner. It should still exist and show **Unassigned**. Try the same check by removing another assignee through **Workspace settings → Members**.
+4. Archive the project and reopen the task URL. It should remain readable. Restore the project to use **Delete task**, then **Delete permanently**. The task URL should stop opening while the project remains accessible.
+
 ## Check the apps
 
 ```sh
@@ -126,4 +133,4 @@ The tests use `devflow_test` and require a transaction-capable MongoDB deploymen
 
 ## Progress
 
-M9 adds workspace role changes and member removal for Owners. Task unassignment is scheduled for M10. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.
+M10 adds task creation, viewing, editing, assignment, and deletion. Removing a project or workspace member now unassigns their tasks. The project task list and board are scheduled for M11. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.

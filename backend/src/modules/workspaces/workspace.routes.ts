@@ -3,6 +3,7 @@ import type { Connection } from 'mongoose'
 import type { authenticate } from '../../middleware/authenticate.js'
 import { validateRequest } from '../../middleware/validate-request.js'
 import type { ProjectModels } from '../projects/project.repository.js'
+import type { TaskRepository } from '../tasks/task.repository.js'
 import type { userModel } from '../users/user.model.js'
 import { invitationController } from './workspace-invitation.controller.js'
 import { workspaceInvitationModel } from './workspace-invitation.model.js'
@@ -26,6 +27,7 @@ export async function createWorkspaceRoutes(
     users: ReturnType<typeof userModel>
   },
   projectModels: ProjectModels,
+  tasks: Pick<TaskRepository, 'unassignInWorkspace'>,
   collections?: WorkspaceCollections,
 ) {
   const workspaces = workspaceModel(connection, collections?.workspaces)
@@ -34,7 +36,7 @@ export async function createWorkspaceRoutes(
   await Promise.all([workspaces.createIndexes(), members.createIndexes(), invitationModel.createIndexes()])
 
   const repository = workspaceRepository(workspaces, members, users, projectModels)
-  const service = workspaceService(repository)
+  const service = workspaceService(repository, tasks)
   const controller = workspaceController(service)
   const invitations = invitationController(invitationService(invitationRepository(invitationModel, workspaces, members, users), repository, service))
   const router = Router()
