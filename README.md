@@ -119,6 +119,14 @@ Set `PASSWORD_RESET_ORIGIN` in `backend/.env` if your browser uses a different f
 2. Assign a task to a Developer in the project. As that Developer, use the card’s **Move to** dropdown to select **In Review**. The card should move to that column. The Developer can change the status of their own unfinished tasks.
 3. As the Owner or assigned Project Manager, reload the board to see the change and move the card to **Done**. Reload as the Developer and confirm the card is visible with its status control hidden.
 
+## Test task search in the browser
+
+1. Open a project and choose **Task list**. Search using a word from a task title, then try pasting its full ID from the task detail page.
+2. Combine **Status**, **Priority**, and **Assignee**. Select **Unassigned** to find tasks waiting for an assignee. Use **Apply filters** to search or **Clear filters** to reset.
+3. With enough results, use **Next** to open another page. Refresh to check that the URL preserves your filters and page. Open **Task board** to return to the complete board.
+
+See the [task search query plans](docs/engineering-notes/005-task-search-indexes.md) for the measured index usage.
+
 ## Check the apps
 
 ```sh
@@ -139,4 +147,4 @@ The tests use `devflow_test` and require a transaction-capable MongoDB deploymen
 
 ## Progress
 
-M11 adds the five-column Kanban board and role-based task status changes. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.
+M12 adds task search, filters, and a paginated task list. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.

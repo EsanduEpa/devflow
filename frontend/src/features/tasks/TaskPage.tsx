@@ -69,6 +69,7 @@ function TaskPanel({ project, userId, task }: { project: Project; userId: string
       <div className="flex flex-wrap gap-3 text-sm">
         <Link to={projectUrl} className={linkClass}>{project.name}</Link>
         <Link to={`${projectUrl}/board`} className={linkClass}>Task board</Link>
+        <Link to={`${projectUrl}/tasks`} className={linkClass}>Task list</Link>
       </div>
       <h1 className="mt-4 break-words text-3xl font-semibold tracking-tight text-slate-950">{task?.title ?? 'Create task'}</h1>
       {!editable && <p className="mt-3 text-sm text-slate-700">Restore this project before changing its tasks.</p>}

@@ -1,9 +1,31 @@
-import { Types, type ClientSession } from 'mongoose'
+import { Types, type ClientSession, type PipelineStage } from 'mongoose'
 import { dateAtUtcMidnight } from '../../shared/date-only.js'
-import type { PageRequest } from '../../shared/pagination.js'
+import { objectId } from '../../shared/object-id.js'
 import type { projectModel } from '../projects/project.model.js'
 import type { TaskRecord, TaskStatus, taskModel } from './task.model.js'
-import type { TaskCreateInput, TaskUpdateInput } from './task.schemas.js'
+import type { TaskCreateInput, TaskListInput, TaskUpdateInput } from './task.schemas.js'
+
+export function taskListPipeline(projectId: string, { page, limit, status, priority, assigneeId, search }: TaskListInput['query']): PipelineStage[] {
+  const exactId = search && objectId.safeParse(search).success ? new Types.ObjectId(search) : undefined
+  const words = !exactId && search ? search.match(/[\p{L}\p{M}\p{N}]+/gu)?.join(' ') : undefined
+  const match = {
+    projectId: new Types.ObjectId(projectId),
+    ...(status && { status }),
+    ...(priority && { priority }),
+    ...(assigneeId && { assigneeId: assigneeId === 'unassigned' ? null : new Types.ObjectId(assigneeId) }),
+    ...(exactId && { _id: exactId }),
+    ...(words && { $text: { $search: words } }),
+    ...(search && !exactId && !words && { _id: { $in: [] } }),
+  }
+  return [
+    { $match: match },
+    { $sort: { createdAt: -1, _id: -1 } },
+    { $facet: {
+      items: [{ $skip: (page - 1) * limit }, { $limit: limit }],
+      count: [{ $count: 'total' }],
+    } },
+  ]
+}
 
 export function taskRepository(tasks: ReturnType<typeof taskModel>, projects: ReturnType<typeof projectModel>) {
   return {
@@ -19,15 +41,8 @@ export function taskRepository(tasks: ReturnType<typeof taskModel>, projects: Re
       return tasks.findById(id).session(session ?? null).lean().exec()
     },
 
-    async list(projectId: string, { page, limit }: PageRequest) {
-      const [result] = await tasks.aggregate<{ items: TaskRecord[]; count: { total: number }[] }>([
-        { $match: { projectId: new Types.ObjectId(projectId) } },
-        { $sort: { createdAt: -1, _id: -1 } },
-        { $facet: {
-          items: [{ $skip: (page - 1) * limit }, { $limit: limit }],
-          count: [{ $count: 'total' }],
-        } },
-      ]).exec()
+    async list(projectId: string, query: TaskListInput['query']) {
+      const [result] = await tasks.aggregate<{ items: TaskRecord[]; count: { total: number }[] }>(taskListPipeline(projectId, query)).exec()
       return { items: result?.items ?? [], total: result?.count[0]?.total ?? 0 }
     },
 

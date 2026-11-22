@@ -17,7 +17,13 @@ export const taskDetailsSchema = details
 export const taskCreateSchema = details.extend({ body: z.strictObject({ ...taskFields, status: z.enum(taskStatuses).optional() }) })
 export const taskStatusSchema = details.extend({ body: z.strictObject({ status: z.enum(taskStatuses) }) })
 export const taskListSchema = details.extend({
-  query: z.strictObject(paginationFields).refine(hasSafePageOffset, { path: ['page'], message: 'Page number is too large.' }),
+  query: z.strictObject({
+    ...paginationFields,
+    status: z.enum(taskStatuses).optional(),
+    priority: z.enum(taskPriorities).optional(),
+    assigneeId: z.union([id, z.literal('unassigned')]).optional(),
+    search: z.string().trim().max(200).optional(),
+  }).refine(hasSafePageOffset, { path: ['page'], message: 'Page number is too large.' }),
 })
 export const taskUpdateSchema = details.extend({
   body: z.strictObject(taskFields).partial().refine((fields) => Object.keys(fields).length > 0, {
