@@ -1,13 +1,10 @@
 import { Types, type ClientSession, type PipelineStage } from 'mongoose'
+import { dateAtUtcMidnight } from '../../shared/date-only.js'
 import type { userModel } from '../users/user.model.js'
 import type { WorkspaceRole, workspaceMemberModel } from '../workspaces/workspace-member.model.js'
 import type { projectMemberModel } from './project-member.model.js'
 import type { ProjectRecord, projectModel } from './project.model.js'
 import type { ProjectCreateInput, ProjectListInput, ProjectUpdateInput } from './project.schemas.js'
-
-function dateAtUtcMidnight(value: string | null) {
-  return value === null ? null : new Date(`${value}T00:00:00.000Z`)
-}
 
 type ProjectPage = { items: ProjectRecord[]; count: { total: number }[] }
 type ProjectMemberSummary = { user: { id: string; name: string }; workspaceRole: WorkspaceRole; joinedAt: Date }

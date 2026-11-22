@@ -7,6 +7,7 @@ import { authErrorMessage, currentUser, logout, type PublicUser } from './featur
 import { afterAuthentication, readInvitationToken } from './features/auth/invitation-return'
 import { AccountSettings } from './features/profile/AccountSettings'
 import { ProjectDetailsPage } from './features/projects/ProjectDetailsPage'
+import { TaskPage } from './features/tasks/TaskPage'
 import { Workspaces } from './features/workspaces/Workspaces'
 import { InvitationPage } from './features/workspaces/InvitationPage'
 
@@ -79,6 +80,8 @@ export default function App() {
             <Route path="/workspaces/*" element={user ? <Workspaces key={user.id} userId={user.id} /> : <Navigate to="/login" replace />} />
             <Route path="/projects/:projectId" element={user ? <ProjectDetailsPage key={user.id} userId={user.id} /> : <Navigate to="/login" replace />} />
             <Route path="/projects/:projectId/settings" element={user ? <ProjectDetailsPage key={user.id} userId={user.id} settings /> : <Navigate to="/login" replace />} />
+            <Route path="/projects/:projectId/tasks/new" element={user ? <TaskPage key={`${user.id}:create`} userId={user.id} create /> : <Navigate to="/login" replace />} />
+            <Route path="/tasks/:taskId" element={user ? <TaskPage key={user.id} userId={user.id} /> : <Navigate to="/login" replace />} />
             <Route path="/invitations/:token" element={<InvitationRoute user={user ?? null} />} />
             <Route path="/forgot-password" element={<ForgotPasswordForm />} />
             <Route path="/reset-password" element={<ResetPasswordForm />} />

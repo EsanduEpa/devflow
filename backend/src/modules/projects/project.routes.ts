@@ -1,6 +1,7 @@
 import { Router, type RequestHandler } from 'express'
 import type { authenticate } from '../../middleware/authenticate.js'
 import { validateRequest } from '../../middleware/validate-request.js'
+import type { TaskRepository } from '../tasks/task.repository.js'
 import type { userModel } from '../users/user.model.js'
 import type { workspaceMemberModel } from '../workspaces/workspace-member.model.js'
 import type { WorkspaceService } from '../workspaces/workspace.service.js'
@@ -19,9 +20,11 @@ export async function createProjectRoutes(
     users: ReturnType<typeof userModel>
   },
   workspaces: { service: WorkspaceService; members: ReturnType<typeof workspaceMemberModel> },
+  tasks: Pick<TaskRepository, 'unassignInProject'>,
 ) {
   await Promise.all([projects.createIndexes(), members.createIndexes()])
-  const controller = projectController(projectService(projectRepository(projects, members, workspaces.members, users), workspaces.service))
+  const service = projectService(projectRepository(projects, members, workspaces.members, users), workspaces.service, tasks)
+  const controller = projectController(service)
 
   const noStore: RequestHandler = (_request, response, next) => {
     response.set('Cache-Control', 'no-store')
@@ -38,5 +41,5 @@ export async function createProjectRoutes(
   projectDetails.post('/:id/members', noStore, requireUser, verifyCsrf, validateRequest(projectMemberAddSchema), controller.addMember)
   projectDetails.delete('/:id/members/:userId', noStore, requireUser, verifyCsrf, validateRequest(projectMemberRemoveSchema), controller.removeMember)
 
-  return { workspaceProjects, projectDetails }
+  return { workspaceProjects, projectDetails, service }
 }

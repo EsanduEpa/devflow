@@ -1,5 +1,6 @@
 import { mongo, type ClientSession } from 'mongoose'
 import { ApiError } from '../../shared/api-error.js'
+import type { TaskRepository } from '../tasks/task.repository.js'
 import type { WorkspaceService } from '../workspaces/workspace.service.js'
 import { publicProject, type ProjectRecord } from './project.model.js'
 import type { ProjectRepository } from './project.repository.js'
@@ -9,7 +10,7 @@ function projectNotFound() {
   return new ApiError(404, 'NOT_FOUND', 'The project was not found.')
 }
 
-export function projectService(repository: ProjectRepository, workspaces: WorkspaceService) {
+export function projectService(repository: ProjectRepository, workspaces: WorkspaceService, tasks: Pick<TaskRepository, 'unassignInProject'>) {
   async function requireAccess(userId: string, id: string, session?: ClientSession) {
     const project = await repository.find(id, session)
     if (!project) throw projectNotFound()
@@ -41,6 +42,12 @@ export function projectService(repository: ProjectRepository, workspaces: Worksp
   }
 
   return {
+    requireAccess,
+    async isEligibleTaskAssignee(project: ProjectRecord, memberId: string, session: ClientSession) {
+      const membership = await repository.hasMembership(project._id.toString(), memberId, session)
+      return !!membership && !!await repository.isWorkspaceMember(project.workspaceId, memberId, session)
+    },
+
     create(userId: string, workspaceId: string, fields: ProjectCreateInput['body']) {
       return repository.transaction(async (session) => {
         const { myRole } = await workspaces.details(userId, workspaceId, session)
@@ -117,7 +124,7 @@ export function projectService(repository: ProjectRepository, workspaces: Worksp
         }
         const result = await repository.removeMember(id, memberId, session)
         if (!result.deletedCount) throw new ApiError(404, 'NOT_FOUND', 'This person is not a member of the project.')
-        // M10 will unassign this member's tasks in the same transaction.
+        await tasks.unassignInProject(id, memberId, userId, session)
       })
     },
   }

@@ -1,5 +1,6 @@
 import type { ClientSession } from 'mongoose'
 import { ApiError } from '../../shared/api-error.js'
+import type { TaskRepository } from '../tasks/task.repository.js'
 import { publicWorkspace } from './workspace.model.js'
 import type { WorkspaceRepository } from './workspace.repository.js'
 import type { WorkspaceCreateInput, WorkspaceMemberRoleInput, WorkspaceUpdateInput } from './workspace.schemas.js'
@@ -8,7 +9,7 @@ function workspaceNotFound() {
   return new ApiError(404, 'NOT_FOUND', 'The workspace was not found.')
 }
 
-export function workspaceService(repository: WorkspaceRepository) {
+export function workspaceService(repository: WorkspaceRepository, tasks: Pick<TaskRepository, 'unassignInWorkspace'>) {
   async function requireMembership(workspaceId: string, userId: string, session?: ClientSession) {
     const membership = await repository.findMembership(workspaceId, userId, session)
     if (!membership) throw workspaceNotFound()
@@ -86,7 +87,7 @@ export function workspaceService(repository: WorkspaceRepository) {
       return manageMember(actorId, workspaceId, userId, async (_target, session) => {
         await requireReassignment(workspaceId, userId, session)
         await repository.removeProjectMemberships(workspaceId, userId, session)
-        // M10 will unassign this member's workspace tasks in the same transaction.
+        await tasks.unassignInWorkspace(workspaceId, userId, actorId, session)
         const removed = await repository.removeWorkspaceMember(workspaceId, userId, session)
         if (!removed.deletedCount) throw new ApiError(404, 'NOT_FOUND', 'The workspace member was not found.')
       })
