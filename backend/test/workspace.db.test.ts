@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import mongoose, { Types } from 'mongoose'
 import request from 'supertest'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApi } from '../src/api.js'
 import { createApp } from '../src/app.js'
 import { authConfig } from '../src/config/auth.js'
@@ -27,8 +27,14 @@ function agent() {
 }
 
 async function submit(client: ReturnType<typeof agent>, method: 'post' | 'patch', url: string, body: object, status: number) {
+  const { call } = await protectedRequest(client, method, url, body)
+  return call.expect(status)
+}
+
+async function protectedRequest(client: ReturnType<typeof agent>, method: 'post' | 'patch' | 'delete', url: string, body?: object) {
   const csrf = await client.get(`${auth}/csrf`).expect(200)
-  return client[method](url).set('Origin', origin).set('X-CSRF-Token', csrf.body.data.csrfToken).send(body).expect(status)
+  const call = client[method](url).set('Origin', origin).set('X-CSRF-Token', csrf.body.data.csrfToken)
+  return { call: body ? call.send(body) : call }
 }
 
 async function createAccount(email: string) {
@@ -49,6 +55,27 @@ function workspaces() {
 
 function members() {
   return mongoose.connection.db!.collection(collections.workspace.members)
+}
+
+function projectMemberships() {
+  return mongoose.connection.db!.collection(collections.project.members)
+}
+
+async function createTeam(name: string, role: 'MANAGER' | 'DEVELOPER' = 'DEVELOPER') {
+  const workspace = await createWorkspace(owner.client, name)
+  const root = `${path}/${workspace.id}`
+  await members().insertOne({ workspaceId: new Types.ObjectId(workspace.id), userId: member.objectId, role, joinedAt: new Date() })
+  return { root, membership: `${root}/members/${member.id}` }
+}
+
+async function createProject(root: string, name: string, managerId = owner.id, status = 'ACTIVE') {
+  const created = await submit(owner.client, 'post', `${root}/projects`, { name, managerId, status }, 201)
+  return created.body.data.id as string
+}
+
+async function removeMember(url: string, status: number, client = owner.client) {
+  const { call } = await protectedRequest(client, 'delete', url)
+  return call.expect(status)
 }
 
 beforeAll(async () => {
@@ -177,4 +204,112 @@ describe('Workspace API with MongoDB', () => {
     expect(await members().countDocuments({ userId: rollbackOwner.objectId })).toBe(1)
     await rollbackOwner.client.get(path).expect(200, { data: [existing] })
   }, 15_000)
+})
+
+describe('Workspace member management', () => {
+  it('allows only the Owner to change roles or remove members and protects the Owner record', async () => {
+    const team = await createTeam('Role management')
+    await request(app).patch(team.membership).send({ role: 'MANAGER' }).expect(401)
+    await owner.client.patch(team.membership).send({ role: 'MANAGER' }).expect(403)
+    await owner.client.delete(team.membership).expect(403)
+    await submit(member.client, 'patch', team.membership, { role: 'MANAGER' }, 403)
+    await removeMember(team.membership, 403, member.client)
+    await removeMember(team.membership, 404, rollbackOwner.client)
+    await submit(owner.client, 'patch', team.membership, { role: 'OWNER' }, 400)
+    await submit(owner.client, 'patch', team.membership, { role: 'MANAGER', userId: owner.id }, 400)
+    await submit(owner.client, 'patch', `${team.root}/members/invalid`, { role: 'MANAGER' }, 400)
+    await submit(owner.client, 'patch', `${team.root}/members/${rollbackOwner.id}`, { role: 'MANAGER' }, 404)
+    const ownerPath = `${team.root}/members/${owner.id.toUpperCase()}`
+    const protectedOwner = await submit(owner.client, 'patch', ownerPath, { role: 'DEVELOPER' }, 409)
+    expect(protectedOwner.body.error.code).toBe('INVALID_STATE')
+    await removeMember(ownerPath, 409)
+
+    const promoted = await submit(owner.client, 'patch', team.membership, { role: 'MANAGER' }, 200)
+    expect(promoted.body.data).toEqual({
+      user: { id: member.id, name: 'Workspace Tester', email: 'member@example.test' },
+      role: 'MANAGER', joinedAt: expect.any(String),
+    })
+    const visible = await member.client.get(team.root).expect(200)
+    expect(visible.body.data.myRole).toBe('MANAGER')
+    await removeMember(ownerPath, 403, member.client)
+
+    await submit(owner.client, 'patch', team.membership, { role: 'DEVELOPER' }, 200)
+    await submit(member.client, 'post', `${team.root}/projects`, { name: 'Create after downgrade', managerId: member.id }, 403)
+    await owner.client.get(team.root).expect(200)
+  }, 45_000)
+
+  it('requires replacement on archived projects and scopes conflicts to the workspace', async () => {
+    const first = await createTeam('Reassignment required', 'MANAGER')
+    const second = await createTeam('Separate project roles', 'MANAGER')
+    const archivedId = await createProject(first.root, 'Archived handoff', member.id, 'ARCHIVED')
+    const separateId = await createProject(second.root, 'Separate responsibility', member.id)
+    const blocked = await submit(owner.client, 'patch', first.membership, { role: 'DEVELOPER' }, 409)
+    expect(blocked.body.error).toMatchObject({ code: 'MANAGER_REPLACEMENT_REQUIRED', message: expect.stringContaining('Archived handoff') })
+    await removeMember(first.membership, 409)
+
+    await submit(owner.client, 'patch', `/api/v1/projects/${archivedId}`, { managerId: owner.id }, 200)
+    await submit(owner.client, 'patch', first.membership, { role: 'DEVELOPER' }, 200)
+    await member.client.get(`/api/v1/projects/${archivedId}`).expect(200)
+    await removeMember(first.membership, 204)
+    await member.client.get(`/api/v1/projects/${archivedId}`).expect(404)
+    await member.client.get(`/api/v1/projects/${separateId}`).expect(200)
+  }, 45_000)
+
+  it('removes project memberships only in the target workspace and revokes access immediately', async () => {
+    const first = await createTeam('Remove access')
+    const second = await createTeam('Keep access')
+    const firstProject = await createProject(first.root, 'First project')
+    const archivedProject = await createProject(first.root, 'Archived project', owner.id, 'ARCHIVED')
+    const secondProject = await createProject(second.root, 'Second project')
+    for (const id of [firstProject, archivedProject, secondProject]) {
+      await submit(owner.client, 'post', `/api/v1/projects/${id}/members`, { userId: member.id }, 201)
+    }
+    await member.client.get(`/api/v1/projects/${firstProject}/members`).expect(200)
+    await removeMember(first.membership, 204)
+    await removeMember(first.membership, 404)
+    const remaining = await projectMemberships().find({
+      userId: member.objectId,
+      projectId: { $in: [firstProject, archivedProject, secondProject].map((id) => new Types.ObjectId(id)) },
+    }).toArray()
+    expect(remaining.map((record) => record.projectId.toString())).toEqual([secondProject])
+    await member.client.get(first.root).expect(404)
+    await member.client.get(`${first.root}/projects`).expect(404)
+    await member.client.get(`/api/v1/projects/${firstProject}`).expect(404)
+    await member.client.get(`/api/v1/projects/${archivedProject}`).expect(404)
+    await owner.client.get(`/api/v1/projects/${firstProject}`).expect(200)
+    await owner.client.get(`/api/v1/projects/${archivedProject}`).expect(200)
+    await member.client.get(`/api/v1/projects/${secondProject}`).expect(200)
+  }, 45_000)
+
+  it('keeps both memberships if removing the workspace record fails', async () => {
+    const team = await createTeam('Workspace removal rollback')
+    const projectId = await createProject(team.root, 'Membership retained')
+    const project = `/api/v1/projects/${projectId}`
+    await submit(owner.client, 'post', `${project}/members`, { userId: member.id }, 201)
+    const deletion = vi.spyOn(mongoose.connection.model('WorkspaceMember').collection, 'deleteOne')
+      .mockRejectedValueOnce(new Error('Intentional failure before workspace membership removal'))
+    try {
+      await removeMember(team.membership, 500)
+      expect(deletion).toHaveBeenCalledTimes(1)
+    } finally {
+      deletion.mockRestore()
+    }
+    await member.client.get(team.root).expect(200)
+    await member.client.get(project).expect(200)
+    expect(await projectMemberships().countDocuments({ userId: member.objectId, projectId: new Types.ObjectId(projectId) })).toBe(1)
+  }, 30_000)
+
+  it('prevents project creation racing against a Manager downgrade from leaving an ineligible manager', async () => {
+    const team = await createTeam('Concurrent role change', 'MANAGER')
+    const create = await protectedRequest(member.client, 'post', `${team.root}/projects`, { name: 'Concurrent project', managerId: member.id })
+    const downgrade = await protectedRequest(owner.client, 'patch', team.membership, { role: 'DEVELOPER' })
+    const [created, changed] = await Promise.all([create.call, downgrade.call])
+
+    expect([[201, 409], [403, 200]]).toContainEqual([created.status, changed.status])
+    const workspace = await member.client.get(team.root).expect(200)
+    const projects = await owner.client.get(`${team.root}/projects`).expect(200)
+    expect(workspace.body.data.myRole).toBe(created.status === 201 ? 'MANAGER' : 'DEVELOPER')
+    expect(projects.body.data.map(({ managerId }: { managerId: string }) => managerId))
+      .toEqual(created.status === 201 ? [member.id] : [])
+  }, 40_000)
 })

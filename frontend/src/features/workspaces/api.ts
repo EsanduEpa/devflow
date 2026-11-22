@@ -1,6 +1,7 @@
 import { apiRequest, submitApi } from '../../shared/api'
 
 export type WorkspaceRole = 'OWNER' | 'MANAGER' | 'DEVELOPER'
+export type EditableWorkspaceRole = Exclude<WorkspaceRole, 'OWNER'>
 
 export interface Workspace {
   id: string
@@ -50,4 +51,13 @@ export async function updateWorkspace(id: string, fields: WorkspaceFields): Prom
 export async function listWorkspaceMembers(id: string, signal?: AbortSignal): Promise<WorkspaceMember[]> {
   const response = await apiRequest(`workspaces/${encodeURIComponent(id)}/members`, { signal })
   return (await response.json()).data
+}
+
+export async function updateWorkspaceMemberRole(workspaceId: string, memberId: string, role: EditableWorkspaceRole): Promise<WorkspaceMember> {
+  const response = await submitApi(`workspaces/${encodeURIComponent(workspaceId)}/members/${encodeURIComponent(memberId)}`, 'PATCH', { role })
+  return (await response.json()).data
+}
+
+export async function removeWorkspaceMember(workspaceId: string, memberId: string) {
+  await submitApi(`workspaces/${encodeURIComponent(workspaceId)}/members/${encodeURIComponent(memberId)}`, 'DELETE')
 }

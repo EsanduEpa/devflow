@@ -27,8 +27,7 @@ export function projectService(repository: ProjectRepository, workspaces: Worksp
     return repository.transaction(async (session) => {
       const { project, canManage } = await requireAccess(userId, id, session)
       if (!canManage) throw new ApiError(403, 'FORBIDDEN', 'Only the workspace owner or assigned project manager can manage this project.')
-      const lock = await repository.lockForManagement(id, session)
-      if (!lock.matchedCount) throw projectNotFound()
+      await workspaces.lockMemberships(project.workspaceId.toString(), session)
       return operation(project, session)
     })
   }
@@ -42,16 +41,19 @@ export function projectService(repository: ProjectRepository, workspaces: Worksp
   }
 
   return {
-    async create(userId: string, workspaceId: string, fields: ProjectCreateInput['body']) {
-      const { myRole } = await workspaces.details(userId, workspaceId)
-      if (myRole === 'DEVELOPER') {
-        throw new ApiError(403, 'FORBIDDEN', 'Only workspace owners and managers can create projects.')
-      }
-      if (myRole === 'MANAGER' && fields.managerId !== userId) {
-        throw new ApiError(403, 'FORBIDDEN', 'When you create a project as a workspace manager, you must assign yourself.')
-      }
-      await validateManager(workspaceId, fields.managerId)
-      return publicProject(await repository.create(workspaceId, fields))
+    create(userId: string, workspaceId: string, fields: ProjectCreateInput['body']) {
+      return repository.transaction(async (session) => {
+        const { myRole } = await workspaces.details(userId, workspaceId, session)
+        if (myRole === 'DEVELOPER') {
+          throw new ApiError(403, 'FORBIDDEN', 'Only workspace owners and managers can create projects.')
+        }
+        if (myRole === 'MANAGER' && fields.managerId !== userId) {
+          throw new ApiError(403, 'FORBIDDEN', 'When you create a project as a workspace manager, you must assign yourself.')
+        }
+        await workspaces.lockMemberships(workspaceId, session)
+        await validateManager(workspaceId, fields.managerId, session)
+        return publicProject(await repository.create(workspaceId, fields, session))
+      })
     },
 
     async list(userId: string, workspaceId: string, query: ProjectListInput['query']) {

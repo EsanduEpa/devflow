@@ -100,6 +100,12 @@ Set `PASSWORD_RESET_ORIGIN` in `backend/.env` if your browser uses a different f
 3. Choose another eligible Manager in **Project manager** and save. The new Manager appears in the member list automatically. The previous Manager remains a project member and can now be removed.
 4. Select **Archived** as the status and choose **Archive project**. Open it again from the workspace’s **Archived** filter. Choose another status in settings and select **Restore project**.
 
+## Test workspace member management in the browser
+
+1. Open **Workspace settings** as the Owner. Under **Members**, choose **Manager** for a Developer and select **Save role**.
+2. Assign that Manager to a project. Try changing their role back to **Developer**, then try removing them. Both actions should tell you to reassign their projects first.
+3. Assign the project to another eligible manager in **Project settings**. Return to **Workspace settings**, update the former Manager’s role, then select **Remove** and confirm. They should lose access to the workspace and its projects on their next request. Their access to other workspaces stays intact.
+
 ## Check the apps
 
 ```sh
@@ -120,4 +126,4 @@ The tests use `devflow_test` and require a transaction-capable MongoDB deploymen
 
 ## Progress
 
-M8 adds project settings, member management, manager reassignment, and archive and restore. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.
+M9 adds workspace role changes and member removal for Owners. Task unassignment is scheduled for M10. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.
