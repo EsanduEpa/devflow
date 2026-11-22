@@ -127,6 +127,13 @@ Set `PASSWORD_RESET_ORIGIN` in `backend/.env` if your browser uses a different f
 
 See the [task search query plans](docs/engineering-notes/005-task-search-indexes.md) for the measured index usage.
 
+## Test the project dashboard in the browser
+
+1. Open a project with no tasks. **Project progress** should show zero for each count and `0%` completion.
+2. As the Owner or assigned Manager, create an **In Progress** task due yesterday and a **To Do** task due today, using UTC calendar dates. Return to the project page and check for two total tasks, one in progress, and one overdue.
+3. On the **Task board**, move the overdue task to **Done**. Return to the project page and check for one completed task, zero overdue, and `50%` completion.
+4. Archive the project from **Project settings** and verify that authorized members can still read its dashboard. An account without access to the project should see the project access message.
+
 ## Check the apps
 
 ```sh
@@ -147,4 +154,4 @@ The tests use `devflow_test` and require a transaction-capable MongoDB deploymen
 
 ## Progress
 
-M12 adds task search, filters, and a paginated task list. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.
+M13 adds project dashboard statistics calculated from task records. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.

@@ -372,3 +372,60 @@ describe('Task search and filters', () => {
     }
   }, 55_000)
 })
+
+describe('Project dashboard', () => {
+  it('returns zero counts for an empty project and enforces project access', async () => {
+    const team = await workspace('Dashboard access workspace')
+    const empty = await project(team, 'Empty dashboard')
+    const restricted = await project(team, 'Restricted dashboard', false)
+    const route = `${empty.url}/dashboard`
+    const expected = { data: {
+      projectId: empty.id, totalTasks: 0, completedTasks: 0, inProgressTasks: 0, overdueTasks: 0, completionPercentage: 0,
+    } }
+
+    await owner.client.get(route).expect('Cache-Control', 'no-store').expect(200, expected)
+    await manager.client.get(route).expect(200, expected)
+    await developer.client.get(route).expect(200, expected)
+    await request(app).get(route).expect(401)
+    const denied = await outsider.client.get(route).expect(404)
+    await developer.client.get(`${restricted.url}/dashboard`).expect(404, denied.body)
+    await owner.client.get(`${api}/projects/${new Types.ObjectId()}/dashboard`).expect(404, denied.body)
+    await owner.client.get(`${api}/projects/invalid/dashboard`).expect(400)
+  }, 45_000)
+
+  it('derives counts and rounded percentages using UTC dates and reflects task changes and archiving', async () => {
+    const team = await workspace('Dashboard statistics workspace')
+    const current = await project(team, 'Current dashboard')
+    const other = await project(team, 'Other dashboard', false)
+    const today = new Date()
+    today.setUTCHours(0, 0, 0, 0)
+    const yesterday = new Date(today.getTime() - 86_400_000)
+    const tomorrow = new Date(today.getTime() + 86_400_000)
+    const active = await createTask(current.url, {
+      title: 'Overdue active task', status: 'IN_PROGRESS', dueDate: yesterday.toISOString().slice(0, 10),
+    })
+    const base = { projectId: new Types.ObjectId(current.id), priority: 'MEDIUM', createdBy: owner.objectId, createdAt: today, updatedAt: today }
+    await db().collection(collections.task.tasks).insertMany([
+      { ...base, title: 'Finished yesterday', status: 'DONE', dueDate: yesterday },
+      { ...base, title: 'Due today', status: 'TODO', dueDate: today },
+      { ...base, title: 'Due tomorrow', status: 'TODO', dueDate: tomorrow },
+      { ...base, title: 'Unscheduled task', status: 'BACKLOG' },
+      { ...base, title: 'Overdue review', status: 'IN_REVIEW', dueDate: yesterday },
+      { ...base, projectId: new Types.ObjectId(other.id), title: 'Unrelated task', status: 'IN_PROGRESS', dueDate: yesterday },
+    ])
+
+    const route = `${current.url}/dashboard`
+    const initial = { projectId: current.id, totalTasks: 6, completedTasks: 1, inProgressTasks: 1, overdueTasks: 2, completionPercentage: 16.67 }
+    await developer.client.get(route).expect(200, { data: initial })
+
+    await mutate(owner.client, 'patch', `${active.url}/status`, 200, { status: 'DONE' })
+    const updated = { ...initial, completedTasks: 2, inProgressTasks: 0, overdueTasks: 1, completionPercentage: 33.33 }
+    await owner.client.get(route).expect(200, { data: updated })
+    await mutate(owner.client, 'patch', current.url, 200, { status: 'ARCHIVED' })
+    await developer.client.get(route).expect(200, { data: updated })
+
+    await mutate(owner.client, 'patch', current.url, 200, { status: 'ACTIVE' })
+    await mutate(owner.client, 'delete', active.url, 204)
+    await owner.client.get(route).expect(200, { data: { ...updated, totalTasks: 5, completedTasks: 1, completionPercentage: 20 } })
+  }, 55_000)
+})
