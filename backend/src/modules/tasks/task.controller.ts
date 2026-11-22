@@ -1,6 +1,6 @@
 import type { Request, RequestHandler } from 'express'
 import type { AuthenticatedLocals } from '../../middleware/authenticate.js'
-import type { TaskCreateInput, TaskDetailsInput, TaskUpdateInput } from './task.schemas.js'
+import type { TaskCreateInput, TaskDetailsInput, TaskListInput, TaskStatusInput, TaskUpdateInput } from './task.schemas.js'
 import type { TaskService } from './task.service.js'
 
 type TaskRequest<Input> = RequestHandler<Request['params'], unknown, unknown, unknown, AuthenticatedLocals & { input: Input }>
@@ -16,6 +16,16 @@ export function taskController(service: TaskService) {
     response.json({ data: await service.details(user.id, input.params.id) })
   }
 
+  const list: TaskRequest<TaskListInput> = async (_request, response) => {
+    const { user, input } = response.locals
+    response.json(await service.list(user.id, input.params.id, input.query))
+  }
+
+  const changeStatus: TaskRequest<TaskStatusInput> = async (_request, response) => {
+    const { user, input } = response.locals
+    response.json({ data: await service.changeStatus(user.id, input.params.id, input.body.status) })
+  }
+
   const update: TaskRequest<TaskUpdateInput> = async (_request, response) => {
     const { user, input } = response.locals
     response.json({ data: await service.update(user.id, input.params.id, input.body) })
@@ -27,5 +37,5 @@ export function taskController(service: TaskService) {
     response.status(204).end()
   }
 
-  return { create, details, update, remove }
+  return { create, details, list, changeStatus, update, remove }
 }

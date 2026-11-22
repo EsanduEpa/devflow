@@ -224,3 +224,77 @@ describe('Task management', () => {
     await developer.client.get(task.url).expect(404)
   }, 45_000)
 })
+
+describe('Kanban task lists and status changes', () => {
+  it('paginates tasks in stable order within the authorized project', async () => {
+    const team = await workspace('Board pagination')
+    const boardProject = await project(team, 'Board with two pages')
+    const other = await project(team, 'Separate board', false)
+    await createTask(other.url, { title: 'Another project task' })
+    const createdAt = new Date()
+    const rows = Array.from({ length: 23 }, (_, index) => ({
+      _id: new Types.ObjectId(), projectId: new Types.ObjectId(boardProject.id),
+      title: `Task ${index + 1}`, status: 'BACKLOG', priority: 'MEDIUM',
+      createdBy: owner.objectId, createdAt, updatedAt: createdAt,
+    }))
+    await db().collection(collections.task.tasks).insertMany(rows)
+    const route = `${boardProject.url}/tasks`
+
+    await request(app).get(route).expect(401)
+    await outsider.client.get(route).expect(404)
+    await developer.client.get(`${other.url}/tasks`).expect(404)
+    const first = await developer.client.get(route).expect('Cache-Control', 'no-store').expect(200)
+    const second = await developer.client.get(`${route}?page=2`).expect(200)
+    expect(first.body.pagination).toEqual({ page: 1, limit: 20, total: 23, totalPages: 2 })
+    expect(second.body.pagination).toEqual({ page: 2, limit: 20, total: 23, totalPages: 2 })
+    const all = [...first.body.data, ...second.body.data]
+    expect(all.map(({ id }) => id)).toEqual([...rows].reverse().map(({ _id }) => _id.toString()))
+    expect(all.every(({ projectId }) => projectId === boardProject.id)).toBe(true)
+    const beyond = await owner.client.get(`${route}?page=3`).expect(200)
+    expect(beyond.body).toEqual({ data: [], pagination: { page: 3, limit: 20, total: 23, totalPages: 2 } })
+    const larger = await owner.client.get(`${route}?limit=100`).expect(200)
+    expect(larger.body.data).toHaveLength(23)
+    for (const query of ['page=0', 'page=1.5', 'limit=101', 'page=1&page=2']) {
+      await owner.client.get(`${route}?${query}`).expect(400)
+    }
+  }, 45_000)
+
+  it('allows assigned Developers to move work for review and reserves Done and reopening for management', async () => {
+    const team = await workspace('Status permissions')
+    const boardProject = await project(team, 'Review board')
+    const task = await createTask(boardProject.url, { title: 'Assigned to Developer', assigneeId: developer.id })
+    const route = `${task.url}/status`
+    await request(app).patch(route).send({ status: 'TODO' }).expect(401)
+    await developer.client.patch(route).send({ status: 'TODO' }).expect(403)
+    await mutate(outsider.client, 'patch', route, 404, { status: 'TODO' })
+    await mutate(owner.client, 'patch', route, 400, { status: 'ACTIVE' })
+    await mutate(owner.client, 'patch', route, 400, { status: 'TODO', updatedBy: outsider.id })
+    for (const status of ['TODO', 'IN_PROGRESS', 'BACKLOG', 'IN_REVIEW']) {
+      const updated = await mutate(developer.client, 'patch', route, 200, { status })
+      expect(updated.body.data).toMatchObject({ id: task.id, status, updatedBy: developer.id, title: 'Assigned to Developer' })
+    }
+    await mutate(developer.client, 'patch', route, 403, { status: 'DONE' })
+    const approved = await mutate(manager.client, 'patch', route, 200, { status: 'DONE' })
+    expect(approved.body.data).toMatchObject({ status: 'DONE', updatedBy: manager.id })
+    await mutate(developer.client, 'patch', route, 403, { status: 'TODO' })
+    const reopened = await mutate(owner.client, 'patch', route, 200, { status: 'TODO' })
+    expect(reopened.body.data).toMatchObject({ status: 'TODO', updatedBy: owner.id, createdBy: owner.id })
+    await mutate(manager.client, 'patch', task.url, 200, { assigneeId: null })
+    await mutate(developer.client, 'patch', route, 403, { status: 'IN_PROGRESS' })
+    await developer.client.get(task.url).expect(200)
+  }, 55_000)
+
+  it('shows archived boards and rejects status changes until the project is restored', async () => {
+    const team = await workspace('Archived board workspace')
+    const boardProject = await project(team, 'Archived board')
+    const task = await createTask(boardProject.url, { title: 'Preserved task', assigneeId: developer.id })
+    const route = `${task.url}/status`
+    await mutate(owner.client, 'patch', boardProject.url, 200, { status: 'ARCHIVED' })
+    await mutate(owner.client, 'patch', route, 409, { status: 'DONE' })
+    await mutate(developer.client, 'patch', route, 409, { status: 'IN_REVIEW' })
+    const archived = await developer.client.get(`${boardProject.url}/tasks`).expect(200)
+    expect(archived.body.data).toEqual([task.data])
+    await mutate(manager.client, 'patch', boardProject.url, 200, { status: 'ACTIVE' })
+    await mutate(developer.client, 'patch', route, 200, { status: 'IN_REVIEW' })
+  }, 45_000)
+})

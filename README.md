@@ -113,6 +113,12 @@ Set `PASSWORD_RESET_ORIGIN` in `backend/.env` if your browser uses a different f
 3. Remove the assignee in **Project settings → Project members**, then refresh the task as Owner. It should still exist and show **Unassigned**. Try the same check by removing another assignee through **Workspace settings → Members**.
 4. Archive the project and reopen the task URL. It should remain readable. Restore the project to use **Delete task**, then **Delete permanently**. The task URL should stop opening while the project remains accessible.
 
+## Test the Kanban board in the browser
+
+1. Open a project and choose **Task board**. The five columns show Backlog, To Do, In Progress, In Review, and Done. Select a task title to open its details.
+2. Assign a task to a Developer in the project. As that Developer, use the card’s **Move to** dropdown to select **In Review**. The card should move to that column. The Developer can change the status of their own unfinished tasks.
+3. As the Owner or assigned Project Manager, reload the board to see the change and move the card to **Done**. Reload as the Developer and confirm the card is visible with its status control hidden.
+
 ## Check the apps
 
 ```sh
@@ -133,4 +139,4 @@ The tests use `devflow_test` and require a transaction-capable MongoDB deploymen
 
 ## Progress
 
-M10 adds task creation, viewing, editing, assignment, and deletion. Removing a project or workspace member now unassigns their tasks. The project task list and board are scheduled for M11. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.
+M11 adds the five-column Kanban board and role-based task status changes. See the [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) for the development sequence.

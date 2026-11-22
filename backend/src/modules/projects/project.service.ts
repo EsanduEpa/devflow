@@ -21,7 +21,7 @@ export function projectService(repository: ProjectRepository, workspaces: Worksp
     })
     const canManage = myRole === 'OWNER' || (myRole === 'MANAGER' && project.managerId.toString() === userId)
     if (!canManage && !await repository.hasMembership(id, userId, session)) throw projectNotFound()
-    return { project, canManage }
+    return { project, canManage, myRole }
   }
 
   function manage<T>(userId: string, id: string, operation: (project: ProjectRecord, session: ClientSession) => Promise<T>) {

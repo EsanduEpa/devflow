@@ -3,9 +3,9 @@ import { ApiError } from '../../shared/api-error.js'
 import type { ProjectRecord } from '../projects/project.model.js'
 import type { ProjectService } from '../projects/project.service.js'
 import type { WorkspaceService } from '../workspaces/workspace.service.js'
-import { publicTask } from './task.model.js'
+import { publicTask, type TaskStatus } from './task.model.js'
 import type { TaskRepository } from './task.repository.js'
-import type { TaskCreateInput, TaskUpdateInput } from './task.schemas.js'
+import type { TaskCreateInput, TaskListInput, TaskUpdateInput } from './task.schemas.js'
 
 function taskNotFound() {
   return new ApiError(404, 'NOT_FOUND', 'The task was not found.')
@@ -61,6 +61,33 @@ export function taskService(repository: TaskRepository, projects: ProjectService
     async details(userId: string, taskId: string) {
       const { task } = await requireTaskAccess(userId, taskId)
       return publicTask(task)
+    },
+
+    async list(userId: string, projectId: string, query: TaskListInput['query']) {
+      await projects.requireAccess(userId, projectId)
+      const { items, total } = await repository.list(projectId, query)
+      return {
+        data: items.map(publicTask),
+        pagination: { page: query.page, limit: query.limit, total, totalPages: Math.ceil(total / query.limit) },
+      }
+    },
+
+    changeStatus(userId: string, taskId: string, status: TaskStatus) {
+      return repository.transaction(async (session) => {
+        const { task, project, canManage, myRole } = await requireTaskAccess(userId, taskId, session)
+        if (!canManage) {
+          if (myRole !== 'DEVELOPER' || task.assigneeId?.toString() !== userId) {
+            throw new ApiError(403, 'FORBIDDEN', 'Only the workspace owner, assigned project manager, or task assignee with the Developer role can change its status.')
+          }
+          if (task.status === 'DONE' || status === 'DONE') {
+            throw new ApiError(403, 'FORBIDDEN', 'Only the workspace owner or assigned project manager can approve or reopen a Done task.')
+          }
+        }
+        await lockEditableProject(project, session)
+        const updated = await repository.updateStatus(taskId, userId, status, session)
+        if (!updated) throw taskNotFound()
+        return publicTask(updated)
+      })
     },
 
     update(userId: string, taskId: string, fields: TaskUpdateInput['body']) {

@@ -24,6 +24,27 @@ export interface Task extends Required<TaskFields> {
 export type TaskChanges = Partial<Omit<TaskFields, 'status'>>
 
 export const taskKey = (userId: string, taskId: string) => ['tasks', userId, 'details', taskId] as const
+export const taskBoardKey = (userId: string, projectId: string) => ['tasks', userId, 'board', projectId] as const
+
+interface TaskPage {
+  data: Task[]
+  pagination: { page: number; limit: number; total: number; totalPages: number }
+}
+
+export async function listBoardTasks(projectId: string, signal: AbortSignal) {
+  async function loadPage(page: number): Promise<TaskPage> {
+    const response = await apiRequest(`projects/${encodeURIComponent(projectId)}/tasks?page=${page}`, { signal })
+    return response.json()
+  }
+
+  const first = await loadPage(1)
+  const tasks = new Map(first.data.map((task) => [task.id, task]))
+  for (let page = 2; page <= first.pagination.totalPages; page++) {
+    const next = await loadPage(page)
+    for (const task of next.data) tasks.set(task.id, task)
+  }
+  return [...tasks.values()]
+}
 
 export async function createTask(projectId: string, fields: TaskFields): Promise<Task> {
   const response = await submitApi(`projects/${encodeURIComponent(projectId)}/tasks`, 'POST', fields)
@@ -37,6 +58,11 @@ export async function getTask(taskId: string, signal?: AbortSignal): Promise<Tas
 
 export async function updateTask(taskId: string, fields: TaskChanges): Promise<Task> {
   const response = await submitApi(`tasks/${encodeURIComponent(taskId)}`, 'PATCH', fields)
+  return (await response.json()).data
+}
+
+export async function updateTaskStatus(taskId: string, status: TaskStatus): Promise<Task> {
+  const response = await submitApi(`tasks/${encodeURIComponent(taskId)}/status`, 'PATCH', { status })
   return (await response.json()).data
 }
 

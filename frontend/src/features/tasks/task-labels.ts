@@ -8,3 +8,5 @@ export const taskStatusLabels: Record<TaskStatus, string> = {
   IN_REVIEW: 'In Review',
   DONE: 'Done',
 }
+
+export const taskStatusOrder: TaskStatus[] = ['BACKLOG', 'TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE']
