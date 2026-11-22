@@ -37,8 +37,12 @@ export async function listTaskPage(projectId: string, query: URLSearchParams, si
   return response.json()
 }
 
-export async function listBoardTasks(projectId: string, signal: AbortSignal) {
-  const loadPage = (page: number) => listTaskPage(projectId, new URLSearchParams({ page: String(page) }), signal)
+export async function listBoardTasks(projectId: string, signal: AbortSignal, filters = new URLSearchParams()) {
+  const loadPage = (page: number) => {
+    const params = new URLSearchParams(filters)
+    params.set('page', String(page))
+    return listTaskPage(projectId, params, signal)
+  }
   const first = await loadPage(1)
   const tasks = new Map(first.data.map((task) => [task.id, task]))
   for (let page = 2; page <= first.pagination.totalPages; page++) {

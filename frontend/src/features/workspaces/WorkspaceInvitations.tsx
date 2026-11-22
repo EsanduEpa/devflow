@@ -1,10 +1,15 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Copy, MailPlus } from 'lucide-react'
 import { apiErrorMessage } from '../../shared/api'
 import { errorClass, fieldClass, linkClass, successClass } from '../../shared/form-styles'
+import { Badge, EmptyState, LoadingState } from '../../shared/ui'
+import { useFieldErrors } from '../../shared/useFieldErrors'
 import { workspaceKeys } from './api'
 import { createInvitation, listInvitations, type InvitationFields } from './invitation-api'
 import { formatDate, invitationStatusLabels, roleLabels } from './workspace-labels'
+
+const invitationTones = { PENDING: 'warning', ACCEPTED: 'success', EXPIRED: 'neutral', REVOKED: 'neutral' } as const
 
 export function WorkspaceInvitations({ userId, workspaceId }: { userId: string; workspaceId: string }) {
   const queryClient = useQueryClient()
@@ -22,6 +27,7 @@ export function WorkspaceInvitations({ userId, workspaceId }: { userId: string; 
     gcTime: 0,
   })
   const invitationUrl = create.data?.acceptUrl
+  const fields = useFieldErrors(create.error)
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -42,25 +48,27 @@ export function WorkspaceInvitations({ userId, workspaceId }: { userId: string; 
   }
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7" aria-labelledby="workspace-invitations">
+    <section className="ui-panel" aria-labelledby="workspace-invitations">
       <h2 className="text-xl font-semibold" id="workspace-invitations">Invitations</h2>
-      <form className="mt-4" onSubmit={submit}>
+      <form className="mt-4 max-w-2xl" onSubmit={submit}>
         <fieldset className="space-y-4" disabled={create.isPending}>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm font-medium">
               Invitee email
-              <input className={fieldClass} name="email" type="email" required />
+              <input className={fieldClass} name="email" type="email" required {...fields.props('email')} />
+              {fields.message('email')}
             </label>
             <label className="block text-sm font-medium">
               Workspace role
-              <select className={fieldClass} name="role" defaultValue="DEVELOPER">
+              <select className={fieldClass} name="role" defaultValue="DEVELOPER" {...fields.props('role')}>
                 <option value="DEVELOPER">Developer</option>
                 <option value="MANAGER">Manager</option>
               </select>
+              {fields.message('role')}
             </label>
           </div>
           {create.error && <p className={errorClass} role="alert">{apiErrorMessage(create.error)}</p>}
-          <button className="rounded-lg bg-indigo-700 px-4 py-2.5 font-medium text-white hover:bg-indigo-800 disabled:opacity-65">
+          <button className="ui-button ui-primary"><MailPlus size={16} aria-hidden="true" />
             {create.isPending ? 'Creating…' : 'Create invitation'}
           </button>
         </fieldset>
@@ -71,27 +79,27 @@ export function WorkspaceInvitations({ userId, workspaceId }: { userId: string; 
             Share this invitation link
             <input className={fieldClass} readOnly value={invitationUrl} onFocus={(event) => event.currentTarget.select()} />
           </label>
-          <button type="button" className={`mt-2 ${linkClass}`} onClick={() => void copyLink(invitationUrl)}>Copy link</button>
+          <button type="button" className="ui-button ui-secondary mt-2" onClick={() => void copyLink(invitationUrl)}><Copy size={15} aria-hidden="true" />Copy link</button>
           {copyMessage && <p className="mt-2" role="status">{copyMessage}</p>}
         </div>
       )}
 
-      <div className="mt-6 border-t border-slate-200 pt-4">
-        {list.isPending ? <p className="text-sm" role="status">Loading invitations…</p> : list.isError ? (
+      <div className="mt-6 border-t border-line pt-4">
+        {list.isPending ? <LoadingState>Loading invitations…</LoadingState> : list.isError ? (
           <>
             <p className={errorClass} role="alert">{apiErrorMessage(list.error)}</p>
             <button className={`mt-2 text-sm ${linkClass}`} onClick={() => void list.refetch()}>Try again</button>
           </>
-        ) : list.data.length === 0 ? <p className="text-sm text-slate-600">No invitations yet.</p> : (
-          <ul className="divide-y divide-slate-200" aria-label="Workspace invitations">
+        ) : list.data.length === 0 ? <EmptyState icon={<MailPlus size={18} aria-hidden="true" />} title="No invitations yet." /> : (
+          <ul className="divide-y divide-line" aria-label="Workspace invitations">
             {list.data.map((invitation) => (
               <li key={invitation.id} className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 py-3 text-sm">
                 <div className="min-w-0">
                   <p className="break-all font-medium">{invitation.email}</p>
-                  <p className="text-slate-600">{roleLabels[invitation.role]}</p>
+                  <p className="text-secondary">{roleLabels[invitation.role]}</p>
                 </div>
-                <div className="text-slate-600">
-                  <p className="font-medium text-indigo-800">{invitationStatusLabels[invitation.status]}</p>
+                <div className="text-secondary">
+                  <Badge tone={invitationTones[invitation.status]}>{invitationStatusLabels[invitation.status]}</Badge>
                   <p>Expires <time dateTime={invitation.expiresAt}>{formatDate(invitation.expiresAt)}</time></p>
                 </div>
               </li>

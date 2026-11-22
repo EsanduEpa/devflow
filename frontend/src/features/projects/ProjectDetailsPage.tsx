@@ -1,105 +1,87 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router'
+import { Link, useLocation, useParams } from 'react-router'
+import { Plus } from 'lucide-react'
 import { ApiError, apiErrorMessage } from '../../shared/api'
 import { formatDateOnly } from '../../shared/date-only'
-import { errorClass, linkClass } from '../../shared/form-styles'
+import { errorClass } from '../../shared/form-styles'
+import { Badge, LoadingState, PageHeader } from '../../shared/ui'
 import { ProjectDashboard } from '../dashboard/ProjectDashboard'
 import { listWorkspaceMembers, workspaceKeys } from '../workspaces/api'
 import { getProject, projectKeys, type Project } from './api'
-import { projectStatusLabels } from './project-labels'
+import { projectStatusLabels, projectStatusTones } from './project-labels'
 import { ProjectMembers } from './ProjectMembers'
 import { ProjectSettings } from './ProjectSettings'
 
-const panelClass = 'w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-9'
-
 function ProjectOverview({ project, userId, settings }: { project: Project; userId: string; settings: boolean }) {
+  const location = useLocation()
   const members = useQuery({
     queryKey: workspaceKeys.members(userId, project.workspaceId),
-    queryFn: ({ signal }) => listWorkspaceMembers(project.workspaceId, signal),
-    retry: false,
-    gcTime: 0,
+    queryFn: ({ signal }) => listWorkspaceMembers(project.workspaceId, signal), retry: false, gcTime: 0,
   })
   const manager = members.isSuccess ? members.data.find(({ user }) => user.id === project.managerId) : undefined
   const role = members.isSuccess ? members.data.find(({ user }) => user.id === userId)?.role : undefined
   const canManage = role === 'OWNER' || (role === 'MANAGER' && project.managerId === userId)
 
   if (settings) {
-    if (members.isPending) return <p role="status">Checking project permissions…</p>
+    if (members.isPending) return <LoadingState>Checking project permissions…</LoadingState>
     if (members.isSuccess && canManage) {
       return <ProjectSettings project={project} userId={userId} isOwner={role === 'OWNER'} workspaceMembers={members.data} />
     }
     return (
-      <section className={panelClass}>
-        <Link to={`/projects/${project.id}`} className={`text-sm ${linkClass}`}>Back to project</Link>
-        <p className={`mt-4 ${errorClass}`} role="alert">{members.isError ? apiErrorMessage(members.error)
+      <section className="ui-panel max-w-xl">
+        <p className={errorClass} role="alert">{members.isError ? apiErrorMessage(members.error)
           : 'Only the workspace owner or assigned project manager can manage this project.'}</p>
-        {members.isError && <button className={`mt-3 text-sm ${linkClass}`} onClick={() => void members.refetch()}>Try again</button>}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link to={`/projects/${project.id}`} className="ui-button ui-secondary">Back to project</Link>
+          {members.isError && <button className="ui-button ui-secondary" onClick={() => void members.refetch()}>Try again</button>}
+        </div>
       </section>
     )
   }
 
   return (
-    <div className="w-full max-w-2xl space-y-5">
-      <section className={panelClass}>
-        <div className="flex flex-wrap justify-between gap-3">
-          <Link to={`/workspaces/${project.workspaceId}`} className={`text-sm ${linkClass}`}>Back to workspace</Link>
-          <div className="flex flex-wrap gap-3">
-            <Link to={`/projects/${project.id}/board`} className={`text-sm ${linkClass}`}>Task board</Link>
-            <Link to={`/projects/${project.id}/tasks`} className={`text-sm ${linkClass}`}>Task list</Link>
-            {project.status !== 'ARCHIVED' &&
-              <Link to={`/projects/${project.id}/tasks/new`} className={`text-sm ${linkClass}`}>Create task</Link>}
-            {canManage && <Link to={`/projects/${project.id}/settings`} className={`text-sm ${linkClass}`}>Project settings</Link>}
-          </div>
-        </div>
-        <h1 className="mt-4 break-words text-3xl font-semibold tracking-tight text-slate-950">{project.name}</h1>
-        {project.description && <p className="mt-4 break-words whitespace-pre-wrap text-slate-700">{project.description}</p>}
-        <dl className="mt-6 grid grid-cols-2 gap-4 border-t border-slate-200 pt-5 text-sm">
-          <div>
-            <dt className="font-medium">Status</dt>
-            <dd className="mt-1 text-slate-700">{projectStatusLabels[project.status]}</dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="font-medium">Project manager</dt>
-            <dd className="mt-1 break-words text-slate-700">{manager?.user.name ?? (members.isPending ? 'Loading…' : 'Unavailable')}</dd>
-          </div>
-          <div>
-            <dt className="font-medium">Start date</dt>
-            <dd className="mt-1 text-slate-700">{formatDateOnly(project.startDate)}</dd>
-          </div>
-          <div>
-            <dt className="font-medium">Target date</dt>
-            <dd className="mt-1 text-slate-700">{formatDateOnly(project.targetDate)}</dd>
-          </div>
-        </dl>
-      </section>
+    <div className="w-full min-w-0 max-w-6xl space-y-5">
+      <PageHeader title={project.name} description={project.description}
+        meta={<Badge tone={projectStatusTones[project.status]}>{projectStatusLabels[project.status]}</Badge>}
+        actions={project.status !== 'ARCHIVED' && <Link to={`/projects/${project.id}/tasks/new`} state={{ taskBackground: location }}
+          className="ui-button ui-primary"><Plus size={17} aria-hidden="true" />Create task</Link>} />
       <ProjectDashboard projectId={project.id} userId={userId} />
-      <ProjectMembers key={project.id} project={project} userId={userId} />
+      <div className="grid min-w-0 items-start gap-4 xl:grid-cols-2">
+        <section className="ui-panel" aria-labelledby="project-details">
+          <h2 id="project-details" className="text-lg font-semibold">Project details</h2>
+          <dl className="mt-3 grid grid-cols-2 gap-4">
+            <div className="col-span-2 min-w-0">
+              <dt className="text-xs font-medium text-secondary">Project manager</dt>
+              <dd className="mt-1 break-words">{manager?.user.name ?? (members.isPending ? 'Loading…' : 'Unavailable')}</dd>
+            </div>
+            <div><dt className="text-xs font-medium text-secondary">Start date</dt><dd className="mt-1">{formatDateOnly(project.startDate)}</dd></div>
+            <div><dt className="text-xs font-medium text-secondary">Target date</dt><dd className="mt-1">{formatDateOnly(project.targetDate)}</dd></div>
+          </dl>
+        </section>
+        <ProjectMembers key={project.id} project={project} userId={userId} />
+      </div>
     </div>
   )
 }
 
 export function ProjectDetailsPage({ userId, settings = false }: { userId: string; settings?: boolean }) {
-  const { projectId = '' } = useParams()
+  const projectId = (useParams().projectId ?? '').toLowerCase()
   const project = useQuery({
     queryKey: projectKeys.details(userId, projectId),
-    queryFn: ({ signal }) => getProject(projectId, signal),
-    retry: false,
-    gcTime: 0,
+    queryFn: ({ signal }) => getProject(projectId, signal), retry: false, gcTime: 0,
   })
 
-  if (project.isPending) return <p role="status">Loading project…</p>
+  if (project.isPending) return <LoadingState>Loading project…</LoadingState>
   if (project.isError) {
     const status = project.error instanceof ApiError ? project.error.status : undefined
-    const message = status === 404
-      ? 'You don’t have access to this project. Check the link or choose a project from your workspace.'
-      : apiErrorMessage(project.error)
     return (
-      <section className={panelClass}>
-        <p className={errorClass} role="alert">{message}</p>
-        <div className="mt-4 flex gap-4 text-sm">
-          <Link to="/workspaces" className={linkClass}>All workspaces</Link>
+      <section className="ui-panel max-w-xl">
+        <p className={errorClass} role="alert">{status === 404
+          ? 'You don’t have access to this project. Check the link or choose a project from your workspace.' : apiErrorMessage(project.error)}</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link to="/workspaces" className="ui-button ui-secondary">All workspaces</Link>
           {(status === undefined || status >= 500) && (
-            <button className={linkClass} onClick={() => void project.refetch()}>Try again</button>
+            <button className="ui-button ui-secondary" onClick={() => void project.refetch()}>Try again</button>
           )}
         </div>
       </section>
