@@ -135,17 +135,19 @@ The current `test:db` script lists its test files explicitly. Add each new datab
 
 **Outcome** Authorized team members can plan, start, and complete sprints. They can view progress and move unfinished work to the backlog or a future sprint.
 
+**Evidence** [M17 verification](engineering-notes/011-m17-sprint-verification.md) · [Sprint API](API_REFERENCE.md#sprints) · [Demo](DEMO.md#m17-sprint-walkthrough)
+
 **Prerequisites** M16 and the existing project and task APIs.
 
 **Study and understand** State transitions, partial unique indexes, and transaction boundaries.
 
 **Steps to complete**
 
-1. [ ] Define the sprint lifecycle and validate dates and allowed transitions. A sprint record with a project reference and an optional sprint reference on each task is the proposed starting model.
-2. [ ] Add management operations for creating, starting, and completing sprints, plus adding and removing project tasks. Add sprint list, detail, and progress views for readers.
-3. [ ] Enforce one active sprint per project. Use a MongoDB constraint that also holds when two managers start different sprints at the same time.
-4. [ ] Complete a sprint and handle unfinished tasks in one transaction. Define whether a return to backlog changes sprint membership, task status, or both, and how completed sprint progress is preserved after tasks move.
-5. [ ] Add the sprint UI so users can view unfinished work and choose a rollover target during completion.
+1. [x] Define the sprint lifecycle and validate dates and allowed transitions. A sprint record with a project reference and an optional sprint reference on each task is the proposed starting model.
+2. [x] Add management operations for creating, starting, and completing sprints, plus adding and removing project tasks. Add sprint list, detail, and progress views for readers.
+3. [x] Enforce one active sprint per project. Use a MongoDB constraint that also holds when two managers start different sprints at the same time.
+4. [x] Complete a sprint and handle unfinished tasks in one transaction. Define whether a return to backlog changes sprint membership, task status, or both, and how completed sprint progress is preserved after tasks move.
+5. [x] Add the sprint UI so users can view unfinished work and choose a rollover target during completion.
 
 **Verify and test** Start two sprints concurrently in one project. Complete a sprint with unfinished tasks and a valid future target, then test a failed rollover and confirm the original sprint and tasks are intact. Check invalid dates, foreign-project tasks, archived-project rules, and tasks created before sprints existed.
 

@@ -3,6 +3,7 @@ import { ApiError } from '../../shared/api-error.js'
 import type { ProjectRecord } from '../projects/project.model.js'
 import type { ProjectService } from '../projects/project.service.js'
 import type { WorkspaceService } from '../workspaces/workspace.service.js'
+import type { SprintRepository } from '../sprints/sprint.repository.js'
 import { publicTask, type TaskStatus } from './task.model.js'
 import type { TaskRepository } from './task.repository.js'
 import type { TaskCreateInput, TaskListInput, TaskUpdateInput } from './task.schemas.js'
@@ -11,7 +12,7 @@ function taskNotFound() {
   return new ApiError(404, 'NOT_FOUND', 'The task was not found.')
 }
 
-export function taskService(repository: TaskRepository, projects: ProjectService, workspaces: WorkspaceService) {
+export function taskService(repository: TaskRepository, projects: ProjectService, workspaces: WorkspaceService, sprints: Pick<SprintRepository, 'find'>) {
   async function requireTaskAccess(userId: string, taskId: string, session?: ClientSession) {
     const task = await repository.find(taskId, session)
     if (!task) throw taskNotFound()
@@ -64,7 +65,11 @@ export function taskService(repository: TaskRepository, projects: ProjectService
     },
 
     async list(userId: string, projectId: string, query: TaskListInput['query']) {
-      await projects.requireAccess(userId, projectId)
+      const { project } = await projects.requireAccess(userId, projectId)
+      if (query.sprintId && query.sprintId !== 'none') {
+        const sprint = await sprints.find(query.sprintId)
+        if (!sprint?.projectId.equals(project._id)) throw new ApiError(404, 'NOT_FOUND', 'The sprint was not found in this project.')
+      }
       const { items, total } = await repository.list(projectId, query)
       return {
         data: items.map(publicTask),

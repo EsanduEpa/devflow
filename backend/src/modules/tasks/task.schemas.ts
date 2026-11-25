@@ -19,11 +19,16 @@ export const taskStatusSchema = details.extend({ body: z.strictObject({ status: 
 export const taskListSchema = details.extend({
   query: z.strictObject({
     ...paginationFields,
+    sprintId: z.union([id, z.literal('none')]).optional(),
+    unfinished: z.literal('true').optional(),
     status: z.enum(taskStatuses).optional(),
     priority: z.enum(taskPriorities).optional(),
     assigneeId: z.union([id, z.literal('unassigned')]).optional(),
     search: z.string().trim().max(200).optional(),
-  }).refine(hasSafePageOffset, { path: ['page'], message: 'Page number is too large.' }),
+  }).refine(hasSafePageOffset, { path: ['page'], message: 'Page number is too large.' })
+    .refine(({ unfinished, sprintId, status }) => !unfinished || (!!sprintId && sprintId !== 'none' && !status), {
+      path: ['unfinished'], message: 'Filter unfinished work in a specific sprint without a status filter.',
+    }),
 })
 export const taskUpdateSchema = details.extend({
   body: z.strictObject(taskFields).partial().refine((fields) => Object.keys(fields).length > 0, {

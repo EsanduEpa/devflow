@@ -5,12 +5,14 @@ import type { projectModel } from '../projects/project.model.js'
 import type { TaskRecord, TaskStatus, taskModel } from './task.model.js'
 import type { TaskCreateInput, TaskListInput, TaskUpdateInput } from './task.schemas.js'
 
-export function taskListPipeline(projectId: string, { page, limit, status, priority, assigneeId, search }: TaskListInput['query']): PipelineStage[] {
+export function taskListPipeline(projectId: string, { page, limit, status, priority, assigneeId, search, sprintId, unfinished }: TaskListInput['query']): PipelineStage[] {
   const exactId = search && objectId.safeParse(search).success ? new Types.ObjectId(search) : undefined
   const words = !exactId && search ? search.match(/[\p{L}\p{M}\p{N}]+/gu)?.join(' ') : undefined
   const match = {
     projectId: new Types.ObjectId(projectId),
     ...(status && { status }),
+    ...(unfinished && { status: { $ne: 'DONE' } }),
+    ...(sprintId && { sprintId: sprintId === 'none' ? null : new Types.ObjectId(sprintId) }),
     ...(priority && { priority }),
     ...(assigneeId && { assigneeId: assigneeId === 'unassigned' ? null : new Types.ObjectId(assigneeId) }),
     ...(exactId && { _id: exactId }),
@@ -44,6 +46,28 @@ export function taskRepository(tasks: ReturnType<typeof taskModel>, projects: Re
     async list(projectId: string, query: TaskListInput['query']) {
       const [result] = await tasks.aggregate<{ items: TaskRecord[]; count: { total: number }[] }>(taskListPipeline(projectId, query)).exec()
       return { items: result?.items ?? [], total: result?.count[0]?.total ?? 0 }
+    },
+
+    async sprintCounts(projectId: Types.ObjectId, ids: Types.ObjectId[], session?: ClientSession) {
+      const counts = await tasks.aggregate<{ _id: Types.ObjectId; totalTasks: number; completedTasks: number }>([
+        { $match: { projectId, sprintId: { $in: ids } } },
+        { $group: {
+          _id: '$sprintId',
+          totalTasks: { $sum: 1 },
+          completedTasks: { $sum: { $cond: [{ $eq: ['$status', 'DONE'] }, 1, 0] } },
+        } },
+      ]).session(session ?? null).exec()
+      return new Map(counts.map(({ _id, totalTasks, completedTasks }) => [_id.toString(), { totalTasks, completedTasks }]))
+    },
+
+    changeSprint(id: string, from: string | null, to: string | null, actorId: string, session: ClientSession) {
+      return tasks.findOneAndUpdate({ _id: id, sprintId: from }, { $set: { sprintId: to, updatedBy: actorId } },
+        { session, returnDocument: 'after', runValidators: true }).lean().exec()
+    },
+
+    rollOverSprint(projectId: Types.ObjectId, from: string, to: string | null, actorId: string, session: ClientSession) {
+      return tasks.updateMany({ projectId, sprintId: from, status: { $ne: 'DONE' } },
+        { $set: { sprintId: to, updatedBy: actorId } }, { session }).exec()
     },
 
     update(id: string, userId: string, { dueDate, ...fields }: TaskUpdateInput['body'], session: ClientSession) {

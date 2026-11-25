@@ -15,6 +15,7 @@ export interface TaskFields {
 export interface Task extends Required<TaskFields> {
   id: string
   projectId: string
+  sprintId: string | null
   createdBy: string
   updatedBy: string | null
   createdAt: string

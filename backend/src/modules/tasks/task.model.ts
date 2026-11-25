@@ -6,6 +6,7 @@ export type TaskStatus = typeof taskStatuses[number]
 
 const taskSchema = new Schema({
   projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, immutable: true },
+  sprintId: { type: Schema.Types.ObjectId, ref: 'Sprint', default: null },
   title: { type: String, trim: true, minlength: 3, maxlength: 200, required: true },
   description: { type: String, trim: true, maxlength: 5000, default: '' },
   assigneeId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
@@ -17,6 +18,7 @@ const taskSchema = new Schema({
 }, { timestamps: true })
 
 taskSchema.index({ projectId: 1, status: 1 })
+taskSchema.index({ projectId: 1, sprintId: 1, createdAt: -1, _id: -1 })
 taskSchema.index({ projectId: 1, createdAt: -1, _id: -1 })
 taskSchema.index({ projectId: 1, assigneeId: 1 })
 taskSchema.index({ projectId: 1, priority: 1 })
@@ -30,6 +32,7 @@ export function taskModel(connection: Connection, collection = 'tasks') {
 export type TaskRecord = {
   _id: Types.ObjectId
   projectId: Types.ObjectId
+  sprintId?: Types.ObjectId | null
   title: string
   description?: string | null
   assigneeId?: Types.ObjectId | null
@@ -46,6 +49,7 @@ export function publicTask(task: TaskRecord) {
   return {
     id: task._id.toString(),
     projectId: task.projectId.toString(),
+    sprintId: task.sprintId?.toString() ?? null,
     title: task.title,
     description: task.description ?? '',
     assigneeId: task.assigneeId?.toString() ?? null,

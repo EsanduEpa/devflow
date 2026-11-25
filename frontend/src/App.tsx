@@ -7,6 +7,7 @@ import { authErrorMessage, currentUser, type PublicUser } from './features/auth/
 import { afterAuthentication, readInvitationToken } from './features/auth/invitation-return'
 import { AccountSettings } from './features/profile/AccountSettings'
 import { ProjectDetailsPage } from './features/projects/ProjectDetailsPage'
+import { ProjectSprintsPage } from './features/sprints/ProjectSprintsPage'
 import { TaskPage, TaskDrawer } from './features/tasks/TaskPage'
 import { TaskBoardPage } from './features/tasks/TaskBoardPage'
 import { ProjectTaskListPage } from './features/tasks/ProjectTaskListPage'
@@ -76,6 +77,7 @@ export default function App() {
         <Route path="/projects/:projectId" element={user ? <ProjectDetailsPage key={user.id} userId={user.id} /> : loginRedirect} />
         <Route path="/projects/:projectId/dashboard" element={user ? <ProjectDetailsPage key={user.id} userId={user.id} /> : loginRedirect} />
         <Route path="/projects/:projectId/settings" element={user ? <ProjectDetailsPage key={user.id} userId={user.id} settings /> : loginRedirect} />
+        <Route path="/projects/:projectId/sprints/:sprintId?" element={user ? <ProjectSprintsPage key={user.id} userId={user.id} /> : loginRedirect} />
         <Route path="/projects/:projectId/board" element={user ? <TaskBoardPage key={user.id} userId={user.id} /> : loginRedirect} />
         <Route path="/projects/:projectId/tasks" element={user ? <ProjectTaskListPage key={user.id} userId={user.id} /> : loginRedirect} />
         <Route path="/projects/:projectId/tasks/new" element={user ? <TaskPage key={`${user.id}:create`} userId={user.id} create /> : loginRedirect} />

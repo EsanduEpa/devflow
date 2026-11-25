@@ -14,6 +14,7 @@ const collections = {
   workspace: { workspaces: `m6_workspaces_${suffix}`, members: `m6_members_${suffix}`, invitations: `m6_invites_${suffix}` },
   project: { projects: `m6_projects_${suffix}`, members: `m6_project_members_${suffix}` },
   task: { tasks: `m6_tasks_${suffix}` },
+  sprint: { sprints: `m6_sprints_${suffix}` },
 }
 const origin = 'http://127.0.0.1:5173'
 const auth = '/api/v1/auth'
