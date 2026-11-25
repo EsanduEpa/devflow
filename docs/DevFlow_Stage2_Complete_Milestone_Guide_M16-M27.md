@@ -265,16 +265,18 @@ The current `test:db` script lists its test files explicitly. Add each new datab
 
 **Outcome** Team members can move tasks between writable status columns and recover when the server rejects a move.
 
+**Evidence** [M22 verification](engineering-notes/016-m22-kanban-verification.md) · [Demo](DEMO.md#m22-kanban-walkthrough)
+
 **Prerequisites** M21 and the existing Kanban board and task status endpoint.
 
 **Study and understand** Accessible drag-and-drop, optimistic UI, and cache reconciliation.
 
 **Steps to complete**
 
-1. [ ] Add drag-and-drop between status columns. Keep the accessible status control available for keyboard and touch users.
-2. [ ] Send the move through the existing status update and permission rules with the expected task version. Document how drops within a single column behave.
-3. [ ] Reconcile the board, task details, and lists after a successful move. Restore or refresh confirmed state on network errors, authorization failures, and stale versions.
-4. [ ] Verify responsive scrolling, focus, and feedback on mobile and desktop.
+1. [x] Add drag-and-drop between status columns. Keep the accessible status control available for keyboard and touch users.
+2. [x] Send the move through the existing status update and permission rules with the expected task version. Document how drops within a single column behave.
+3. [x] Reconcile the board, task details, and lists after a successful move. Restore or refresh confirmed state on network errors, authorization failures, and stale versions.
+4. [x] Verify responsive scrolling, focus, and feedback on mobile and desktop.
 
 **Verify and test** Move an assigned task as a Developer, exercise review and Done with the roles allowed by Stage 1, and try a rejected move and a stale drop. Refresh and compare the board with the task detail. Test the keyboard status control and a narrow screen.
 

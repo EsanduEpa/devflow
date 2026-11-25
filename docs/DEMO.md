@@ -95,3 +95,15 @@ npm --prefix backend run test:e2e -- dependencies.e2e.ts
 ```sh
 npm --prefix backend run test:e2e -- task-conflicts.e2e.ts
 ```
+
+## M22 Kanban walkthrough
+
+1. Open an editable project’s **Board** as a Developer. On a task assigned to you, drag the grip from **Backlog** to **In Progress**, then to **In Review**. Each move appears immediately and shows a confirmation after saving.
+2. Try dropping the card back into its current column, then try dragging it to **Done** as the Developer. Both attempts leave the card in its current column.
+3. Open the board as the assigned Manager or Owner. Drag the task to **Done**. Refresh the board and open the task to verify that both views show Done.
+4. On a separate task, use the **Move to** dropdown with the keyboard or on a narrow touch screen. Check that the board scrolls horizontally and the control remains usable.
+5. To test rejection, have the Owner unassign a task in another browser after the Developer opens the board. Drop it into a writable column from the stale board. The app restores the confirmed status and refreshes permissions.
+
+```sh
+npm --prefix backend run test:e2e -- kanban-drag-drop.e2e.ts
+```
