@@ -1,16 +1,61 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiErrorMessage } from '../../shared/api'
 import { errorClass, fieldClass } from '../../shared/form-styles'
-import { activityKey } from '../activity/api'
-import { dependencyKeys } from '../dependencies/api'
 import type { Project } from '../projects/api'
 import type { WorkspaceRole } from '../workspaces/api'
-import { taskBoardKey, taskKey, updateTaskStatus, type Task, type TaskStatus } from './api'
+import type { Task, TaskStatus } from './api'
 import { TaskConflictNotice } from './TaskConflictNotice'
-import { taskStatusLabels, taskStatusOrder } from './task-labels'
-import { isTaskConflict, useTaskConflict } from './useTaskConflict'
+import { taskStatusLabels } from './task-labels'
+import { allowedTaskStatuses, useTaskStatusMove } from './task-status-move'
+import { isTaskConflict } from './useTaskConflict'
 
-const developerStatuses = taskStatusOrder.filter((status) => status !== 'DONE')
+export function TaskStatusSelect({ task, destinations, disabled, onMove }: {
+  task: Task
+  destinations: TaskStatus[]
+  disabled: boolean
+  onMove: (status: TaskStatus) => void
+}) {
+  if (!destinations.length) return null
+  return <label className="block text-xs font-medium text-secondary">
+    Move to
+    <select className={`${fieldClass} mt-1.5 min-h-9 px-2 py-1.5 text-xs max-sm:min-h-11`}
+      aria-label={`Change status for ${task.title}`} value={task.status} disabled={disabled} data-task-status-control={task.id}
+      onChange={(event) => onMove(event.target.value as TaskStatus)}>
+      {destinations.map((status) => <option key={status} value={status}>{taskStatusLabels[status]}</option>)}
+    </select>
+  </label>
+}
+
+export function TaskMoveFeedback({ mover, destinations, announceSuccess = false }: {
+  mover: ReturnType<typeof useTaskStatusMove>
+  destinations: TaskStatus[]
+  announceSuccess?: boolean
+}) {
+  const { mutation, conflict } = mover
+  const requested = conflict.attempt?.intent.status
+  const latest = conflict.current
+
+  return <>
+    {mutation.isPending && <p className="text-xs text-secondary" role="status">Saving status…</p>}
+    {announceSuccess && mutation.isSuccess && <p className="text-sm text-secondary" role="status">
+      {mutation.data.title} moved to {taskStatusLabels[mutation.data.status]}.
+    </p>}
+    {mutation.error && !isTaskConflict(mutation.error) && <p className={errorClass} role="alert">{apiErrorMessage(mutation.error)}</p>}
+    {requested && <TaskConflictNotice message={`Your requested status was ${taskStatusLabels[requested]}.`}
+      pending={conflict.pending} error={conflict.error} reload={conflict.reload}>
+      {latest && <p className="break-words text-sm text-ink">
+        {announceSuccess && <span className="font-semibold">{latest.title}. </span>}
+        Latest status is <strong>{taskStatusLabels[latest.status]}</strong>.
+      </p>}
+      <div className="flex flex-wrap gap-2">
+        {latest && requested !== latest.status && destinations.includes(requested) &&
+          <button type="button" className="ui-button ui-primary" disabled={mutation.isPending}
+            onClick={() => mover.move(latest, requested, conflict.attempt?.intent.preview)}>Retry status change</button>}
+        <button type="button" className="ui-button ui-secondary" disabled={mutation.isPending}
+          onClick={mover.dismissConflict}>Dismiss status change</button>
+      </div>
+    </TaskConflictNotice>}
+  </>
+}
 
 export function TaskStatusControl({ task, project, userId, role }: {
   task: Task
@@ -18,60 +63,13 @@ export function TaskStatusControl({ task, project, userId, role }: {
   userId: string
   role?: WorkspaceRole
 }) {
-  const client = useQueryClient()
-  const conflict = useTaskConflict<TaskStatus>()
-  const current = conflict.current ?? task
-  async function refresh(updated: Task) {
-    client.setQueryData(taskKey(userId, task.id), updated)
-    await Promise.all([
-      client.invalidateQueries({ queryKey: activityKey(userId, task.id) }),
-      client.invalidateQueries({ queryKey: dependencyKeys.project(userId, project.id) }),
-      client.invalidateQueries({ queryKey: taskBoardKey(userId, project.id) }),
-      client.invalidateQueries({ queryKey: ['tasks', userId, 'list', project.id] }),
-      client.invalidateQueries({ queryKey: ['dashboard', userId, project.id] }),
-    ])
-  }
-  const change = useMutation({
-    mutationFn: ({ status, version }: { status: TaskStatus; version: number }) => updateTaskStatus(task.id, status, version),
-    onSuccess: async (updated) => {
-      conflict.clear()
-      await refresh(updated)
-    },
-    onError: (error, { status }) => conflict.capture(error, task.id, status),
-  })
-  const canManage = role === 'OWNER' || (role === 'MANAGER' && project.managerId === userId)
-  const canMove = project.status !== 'ARCHIVED'
-    && (canManage || (role === 'DEVELOPER' && current.assigneeId === userId && current.status !== 'DONE'))
-  if (!canMove && !conflict.attempt) return null
-  const destinations = canManage ? taskStatusOrder : developerStatuses
-  const requested = conflict.attempt?.intent
-
-  return (
-    <div className="mt-3 space-y-2 border-t border-line pt-2">
-      {canMove && <label className="block text-xs font-medium text-secondary">
-        Move to
-        <select className={`${fieldClass} mt-1.5 min-h-9 px-2 py-1.5 text-xs max-sm:min-h-11`}
-          aria-label={`Change status for ${task.title}`} value={current.status} disabled={change.isPending || !!conflict.attempt}
-          onChange={(event) => change.mutate({ status: event.target.value as TaskStatus, version: current.version })}>
-          {destinations.map((status) => <option key={status} value={status}>{taskStatusLabels[status]}</option>)}
-        </select>
-      </label>}
-      {change.isPending && <p className="text-xs text-secondary" role="status">Saving status…</p>}
-      {change.error && !isTaskConflict(change.error) && <p className={errorClass} role="alert">{apiErrorMessage(change.error)}</p>}
-      {requested && <TaskConflictNotice message={`Your requested status was ${taskStatusLabels[requested]}.`}
-        pending={conflict.pending} error={conflict.error} reload={conflict.reload}>
-        {conflict.current && <p className="text-sm text-ink">Latest status is <strong>{taskStatusLabels[current.status]}</strong>.</p>}
-        <div className="flex flex-wrap gap-2">
-          {conflict.current && canMove && requested !== current.status && destinations.includes(requested) &&
-            <button type="button" className="ui-button ui-primary" disabled={change.isPending}
-              onClick={() => change.mutate({ status: requested, version: current.version })}>Retry status change</button>}
-          <button type="button" className="ui-button ui-secondary" disabled={change.isPending} onClick={() => {
-            if (conflict.current) void refresh(conflict.current)
-            conflict.clear()
-            change.reset()
-          }}>Dismiss status change</button>
-        </div>
-      </TaskConflictNotice>}
-    </div>
-  )
+  const mover = useTaskStatusMove(userId, project)
+  const current = mover.conflict.current ?? task
+  const destinations = allowedTaskStatuses(current, project, userId, role)
+  if (!destinations.length && !mover.conflict.attempt) return null
+  return <div className="mt-3 space-y-2 border-t border-line pt-2">
+    <TaskStatusSelect task={current} destinations={destinations} disabled={mover.mutation.isPending || !!mover.conflict.attempt}
+      onMove={(status) => mover.move(current, status)} />
+    <TaskMoveFeedback mover={mover} destinations={destinations} />
+  </div>
 }
