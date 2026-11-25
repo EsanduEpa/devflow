@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiErrorMessage } from '../../shared/api'
 import { errorClass, fieldClass } from '../../shared/form-styles'
+import { dependencyKeys } from '../dependencies/api'
 import { activityKey } from '../activity/api'
 import type { Project } from '../projects/api'
 import type { WorkspaceRole } from '../workspaces/api'
@@ -22,6 +23,7 @@ export function TaskStatusControl({ task, project, userId, role }: {
       client.setQueryData(taskKey(userId, task.id), updated)
       await Promise.all([
         client.invalidateQueries({ queryKey: activityKey(userId, task.id) }),
+        client.invalidateQueries({ queryKey: dependencyKeys.project(userId, project.id) }),
         client.invalidateQueries({ queryKey: taskBoardKey(userId, project.id) }),
         client.invalidateQueries({ queryKey: ['tasks', userId, 'list', project.id] }),
         client.invalidateQueries({ queryKey: ['dashboard', userId, project.id] }),

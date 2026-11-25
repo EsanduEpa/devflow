@@ -69,3 +69,17 @@ Run the [browser walkthrough](../backend/e2e/activity.e2e.ts) with isolated test
 ```sh
 npm --prefix backend run test:e2e -- activity.e2e.ts
 ```
+
+## M20 dependency walkthrough
+
+1. As an Owner or assigned Manager, create **Publish release**, **Review release**, and **Prepare release** in one project.
+2. Open **Publish release**. Under **Dependencies**, choose **Add prerequisite**. Add **Review release**. Publish shows **Blocked**. Review lists Publish under **Dependent tasks**.
+3. Add **Prepare release** as a prerequisite of Review. Then open Prepare and try to add Publish as its prerequisite. The app rejects the cycle.
+4. Mark Review **Done**, then refresh Publish in a project Developer’s session. Its Blocked badge disappears. Reopen Review and refresh Publish again to see the badge return.
+5. Permanently delete Review. Publish loses that prerequisite and its Blocked badge. Prepare no longer lists Review as a dependent.
+
+The Developer can read the graph. In their session the management controls are hidden.
+
+```sh
+npm --prefix backend run test:e2e -- dependencies.e2e.ts
+```

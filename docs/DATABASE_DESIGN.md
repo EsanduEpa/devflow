@@ -1532,12 +1532,19 @@ The `task_activity` collection stores an immutable task reference, actor referen
 
 Actor departure preserves references in existing activity. The read path returns the profile display name when available. Task deletion removes activity and comments in the task’s deletion transaction.
 
+## Implemented in M20
+
+The `task_dependencies` collection stores `projectId`, `taskId`, and `prerequisiteId`. The unique index `{ projectId: 1, taskId: 1, prerequisiteId: 1 }` protects directed pairs and supports outgoing lookups. The reverse index `{ projectId: 1, prerequisiteId: 1, taskId: 1 }` supports incoming lookups.
+
+Dependency changes and incident-edge cleanup reuse the shared workspace write lock and transaction boundary. To add A → B, the service checks reachability from B to A inside the same transaction as the insert. Permanent task deletion removes incoming and outgoing edges atomically.
+
+Blocked state is derived from current direct prerequisites. At least one direct prerequisite outside `DONE` makes the task blocked. M25 filters and dashboard counts use this same predicate.
+
 ## Future collections
 
 **Stage 2**
 
 - Notifications.
-- Task dependencies.
 
 **Stage 3**
 
