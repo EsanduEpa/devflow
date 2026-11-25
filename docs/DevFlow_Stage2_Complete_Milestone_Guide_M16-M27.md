@@ -110,16 +110,18 @@ The current `test:db` script lists its test files explicitly. Add each new datab
 
 **Outcome** A reproducible MVP baseline and enough detail to start sprint management without revisiting approved Stage 1 decisions.
 
+**Evidence** [Stage 1 baseline](engineering-notes/010-m16-baseline.md) · [Stage 2 contracts and M17 acceptance cases](engineering-notes/009-stage2-contracts.md)
+
 **Prerequisites** Stage 1 merged to `main` and tagged `v1.0.0-mvp`.
 
 **Study and understand** API compatibility, project-level permissions, and how database constraints protect business rules when requests overlap.
 
 **Steps to complete**
 
-1. [ ] Start the M16 branch. Run the Stage 1 checks and record the results alongside the existing MVP verification record.
-2. [ ] Map Stage 2 operations to the existing workspace and project roles. Specify permissions for sprint changes, comments, dependencies, archived projects, and socket subscriptions.
-3. [ ] Outline the REST and Socket.IO contracts, data relationships, and compatibility for existing records and callers. Record which contracts each milestone owns and the failure responses the UI needs.
-4. [ ] Record scope questions where behavior affects later milestones. Include the sprint rollover policy, notification recipients and timing, and how the project invitation example relates to the implemented workspace invitation flow.
+1. [x] Start the M16 branch. Run the Stage 1 checks and record the results alongside the existing MVP verification record.
+2. [x] Map Stage 2 operations to the existing workspace and project roles. Specify permissions for sprint changes, comments, dependencies, archived projects, and socket subscriptions.
+3. [x] Outline the REST and Socket.IO contracts, data relationships, and compatibility for existing records and callers. Record which contracts each milestone owns and the failure responses the UI needs.
+4. [x] Record scope questions where behavior affects later milestones. Include the sprint rollover policy, notification recipients and timing, and how the project invitation example relates to the implemented workspace invitation flow.
 
 **Verify and test** Confirm the health endpoint and the baseline tests. Walk through the proposed permission matrix with an Owner, a Manager assigned to the project, a Developer, and an authenticated user outside the project.
 
