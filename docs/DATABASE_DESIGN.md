@@ -1526,11 +1526,16 @@ The `comments` collection stores `taskId`, `authorId`, plain-text `body`, up to 
 
 Comment mutations use the shared workspace write lock so project membership, archive status and parent-task checks stay valid through commit. Task deletion removes its comments within the same transaction. Each revision stores only the mention delta for that revision. The occurrence identity and later notification integration are recorded in the [M18 implementation notes](engineering-notes/012-m18-comment-verification.md).
 
+## Implemented in M19
+
+The `task_activity` collection stores an immutable task reference, actor reference, action, before-and-after changes, completion flag and timestamp. Its `{ taskId: 1, createdAt: -1, _id: -1 }` index serves the task timeline in descending order. An update groups all tracked changes for one task into one entry. Sprint rollover and membership-driven unassignment append an entry per affected task in the same transaction as the write.
+
+Actor departure preserves references in existing activity. The read path returns the profile display name when available. Task deletion removes activity and comments in the task’s deletion transaction.
+
 ## Future collections
 
 **Stage 2**
 
-- Activity history.
 - Notifications.
 - Task dependencies.
 

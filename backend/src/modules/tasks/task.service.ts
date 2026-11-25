@@ -1,11 +1,13 @@
 import type { ClientSession } from 'mongoose'
 import { ApiError } from '../../shared/api-error.js'
+import type { ActivityRepository } from '../activity/activity.repository.js'
+import { recordTaskActivity } from '../activity/task-activity.js'
 import type { CommentRepository } from '../comments/comment.repository.js'
 import type { ProjectRecord } from '../projects/project.model.js'
 import type { ProjectService } from '../projects/project.service.js'
 import type { WorkspaceService } from '../workspaces/workspace.service.js'
 import type { SprintRepository } from '../sprints/sprint.repository.js'
-import { publicTask, type TaskStatus } from './task.model.js'
+import { publicTask, type TaskRecord, type TaskStatus } from './task.model.js'
 import type { TaskRepository } from './task.repository.js'
 import type { TaskCreateInput, TaskListInput, TaskUpdateInput } from './task.schemas.js'
 
@@ -16,6 +18,7 @@ function taskNotFound() {
 export function taskService(
   repository: TaskRepository, projects: ProjectService, workspaces: WorkspaceService,
   sprints: Pick<SprintRepository, 'find'>, comments: Pick<CommentRepository, 'removeForTask'>,
+  activity: Pick<ActivityRepository, 'append' | 'removeForTask'>,
 ) {
   async function requireTaskAccess(userId: string, taskId: string, session?: ClientSession) {
     const task = await repository.find(taskId, session)
@@ -34,12 +37,12 @@ export function taskService(
     await workspaces.lockMemberships(project.workspaceId.toString(), session)
   }
 
-  function manage<T>(userId: string, taskId: string, operation: (project: ProjectRecord, session: ClientSession) => Promise<T>) {
+  function manage<T>(userId: string, taskId: string, operation: (project: ProjectRecord, task: TaskRecord, session: ClientSession) => Promise<T>) {
     return repository.transaction(async (session) => {
-      const { project, canManage } = await requireTaskAccess(userId, taskId, session)
+      const { project, canManage, task } = await requireTaskAccess(userId, taskId, session)
       if (!canManage) throw new ApiError(403, 'FORBIDDEN', 'Only the workspace owner or assigned project manager can edit or delete tasks.')
       await lockEditableProject(project, session)
-      return operation(project, session)
+      return operation(project, task, session)
     })
   }
 
@@ -61,7 +64,9 @@ export function taskService(
         }
         await lockEditableProject(project, session)
         await validateAssignee(project, fields.assigneeId, session)
-        return publicTask(await repository.create(projectId, userId, fields, session))
+        const task = await repository.create(projectId, userId, fields, session)
+        await recordTaskActivity(activity, task, userId, null, session)
+        return publicTask(task)
       })
     },
 
@@ -97,24 +102,27 @@ export function taskService(
         await lockEditableProject(project, session)
         const updated = await repository.updateStatus(taskId, userId, status, session)
         if (!updated) throw taskNotFound()
+        await recordTaskActivity(activity, updated, userId, task, session)
         return publicTask(updated)
       })
     },
 
     update(userId: string, taskId: string, fields: TaskUpdateInput['body']) {
-      return manage(userId, taskId, async (project, session) => {
+      return manage(userId, taskId, async (project, task, session) => {
         await validateAssignee(project, fields.assigneeId, session)
         const updated = await repository.update(taskId, userId, fields, session)
         if (!updated) throw taskNotFound()
+        await recordTaskActivity(activity, updated, userId, task, session)
         return publicTask(updated)
       })
     },
 
     remove(userId: string, taskId: string) {
-      return manage(userId, taskId, async (_project, session) => {
+      return manage(userId, taskId, async (_project, _task, session) => {
         const result = await repository.remove(taskId, session)
         if (!result.deletedCount) throw taskNotFound()
         await comments.removeForTask(taskId, session)
+        await activity.removeForTask(taskId, session)
       })
     },
   }

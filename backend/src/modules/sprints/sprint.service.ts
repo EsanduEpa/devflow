@@ -1,5 +1,7 @@
 import { mongo, type ClientSession } from 'mongoose'
 import { ApiError } from '../../shared/api-error.js'
+import type { ActivityRepository } from '../activity/activity.repository.js'
+import { recordTaskActivity } from '../activity/task-activity.js'
 import type { PageRequest } from '../../shared/pagination.js'
 import type { ProjectRecord } from '../projects/project.model.js'
 import type { ProjectService } from '../projects/project.service.js'
@@ -17,6 +19,7 @@ const invalidSelection = (field: string, message: string) => new ApiError(400, '
 
 export function sprintService(
   repository: SprintRepository, tasks: TaskRepository, projects: ProjectService, workspaces: WorkspaceService,
+  activity: Pick<ActivityRepository, 'append'>,
 ) {
   async function requireSprint(userId: string, id: string, session?: ClientSession) {
     const sprint = await repository.find(id, session)
@@ -67,6 +70,7 @@ export function sprintService(
       if (!add && current !== id) throw new ApiError(404, 'NOT_FOUND', 'The task is not in this sprint.')
       const updated = await tasks.changeSprint(taskId, current, add ? id : null, userId, session)
       if (!updated) throw invalidState('The task’s sprint changed. Refresh and try again.')
+      await recordTaskActivity(activity, updated, userId, task, session)
       return publicTask(updated)
     })
   }

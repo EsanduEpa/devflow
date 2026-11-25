@@ -109,3 +109,11 @@ Authorized project readers can view comments. Project readers can post to editab
 | `DELETE /tasks/:taskId/comments/:commentId` | — | `204` Comment deleted | `403 FORBIDDEN`, `404 NOT_FOUND`, `409 INVALID_STATE` |
 
 Comment fields are `id`, `taskId`, `author: { id, name }`, `body`, `mentionUserIds`, `mentions: [{ id, name }]`, `revision`, `createdAt`, and `updatedAt`. A missing person’s display name is `null`. The body is plain text and accepts 1–5,000 characters after trimming. Mention IDs are a distinct list of up to 20 eligible users. On edit, the server validates the resulting list. Remove any mention that has lost project access before saving. Use an empty list to clear mentions. Deleting a task permanently removes its comments.
+
+## Task activity
+
+`GET /tasks/:taskId/activity` returns `200` with paginated activity. It accepts `page` and `limit` and sorts newest first by timestamp and ID. A missing or inaccessible task returns `404 NOT_FOUND`. Authorized readers can view activity on tasks in archived projects.
+
+Each entry includes `id`, `taskId`, `actor: { id, name }`, `action`, `changes`, `completed`, and `createdAt`. Action is `TASK_CREATED` or `TASK_UPDATED`. A change has `field`, `from`, and `to`. Tracked fields are `assigneeId`, `priority`, `status` and `sprintId`. Reference changes also include nullable `fromLabel` and `toLabel`. An unavailable actor is represented by their ID and a null name.
+
+A creation entry contains the initial non-null tracked values. Updates record only actual changes, grouped in one entry per task and operation. A transition into `DONE` sets `completed: true` on that status entry. A task created in `DONE` has an initial Done status in its creation entry. Tasks created before M19 start with empty history. Permanent task deletion removes its timeline.

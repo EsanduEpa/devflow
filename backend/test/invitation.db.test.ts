@@ -16,6 +16,7 @@ const collections = {
   task: { tasks: `m6_tasks_${suffix}` },
   sprint: { sprints: `m6_sprints_${suffix}` },
   comment: { comments: `m6_comments_${suffix}` },
+  activity: { activity: `m6_activity_${suffix}` },
 }
 const origin = 'http://127.0.0.1:5173'
 const auth = '/api/v1/auth'
