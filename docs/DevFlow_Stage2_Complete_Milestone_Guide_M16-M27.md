@@ -188,16 +188,18 @@ The current `test:db` script lists its test files explicitly. Add each new datab
 
 **Outcome** An authorized reader can see a chronological record of meaningful task changes and who made them.
 
+**Evidence** [M19 verification](engineering-notes/013-m19-activity-verification.md) · [Activity API](API_REFERENCE.md#task-activity) · [Demo](DEMO.md#m19-activity-walkthrough)
+
 **Prerequisites** M17–M18 and the existing task write paths.
 
 **Study and understand** Activity records, stable sort order, and atomic persistence of a change and its history.
 
 **Steps to complete**
 
-1. [ ] Define activity records for task creation, assignment, status, priority, sprint movement, and completion. Specify which transitions produce a single record and which record multiple facts.
-2. [ ] Write activity from the successful task and sprint operations. Keep a task change and its required history consistent when a write fails, including during sprint rollover.
-3. [ ] Define how history references behave when a task is deleted or an actor leaves. Limit the payload to fields the viewer may see.
-4. [ ] Add a scoped, paginated activity endpoint and a task timeline that shows the actor, action, and timestamp.
+1. [x] Define activity records for task creation, assignment, status, priority, sprint movement, and completion. Specify which transitions produce a single record and which record multiple facts.
+2. [x] Write activity from the successful task and sprint operations. Keep a task change and its required history consistent when a write fails, including during sprint rollover.
+3. [x] Define how history references behave when a task is deleted or an actor leaves. Limit the payload to fields the viewer may see.
+4. [x] Add a scoped, paginated activity endpoint and a task timeline that shows the actor, action, and timestamp.
 
 **Verify and test** Perform each documented action. Compare history with the actual result, confirm a failed operation leaves no misleading entry, and check that an outsider cannot load the timeline.
 

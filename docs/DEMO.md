@@ -56,3 +56,16 @@ Run the [browser walkthrough](../backend/e2e/comments.e2e.ts) with isolated test
 ```sh
 npm --prefix backend run test:e2e -- comments.e2e.ts
 ```
+
+## M19 activity walkthrough
+
+1. As Owner or assigned Manager, create a task with the default fields. Then edit it to assign a Developer and set priority to High in the same save. Open **Activity** on task details. The creation and update entries show the actor and time, and the update groups assignment and priority changes.
+2. As the assigned Developer, move the task to **In Review**. The timeline shows the status change. A manager can then move it to **Done** and verify that one entry shows completion and the transition.
+3. Create a second task, add it to an active sprint, then complete the sprint and choose a rollover destination. Open that task’s **Activity** and check that it shows the original sprint and destination.
+4. Open the task link as a signed-in outsider. DevFlow denies access to the task and its timeline.
+
+Run the [browser walkthrough](../backend/e2e/activity.e2e.ts) with isolated test data.
+
+```sh
+npm --prefix backend run test:e2e -- activity.e2e.ts
+```

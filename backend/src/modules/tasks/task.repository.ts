@@ -1,4 +1,6 @@
-import { Types, type ClientSession, type PipelineStage } from 'mongoose'
+import { Types, type ClientSession, type PipelineStage, type QueryFilter } from 'mongoose'
+import type { ActivityChange } from '../activity/activity.model.js'
+import type { ActivityRepository } from '../activity/activity.repository.js'
 import { dateAtUtcMidnight } from '../../shared/date-only.js'
 import { objectId } from '../../shared/object-id.js'
 import type { projectModel } from '../projects/project.model.js'
@@ -29,7 +31,24 @@ export function taskListPipeline(projectId: string, { page, limit, status, prior
   ]
 }
 
-export function taskRepository(tasks: ReturnType<typeof taskModel>, projects: ReturnType<typeof projectModel>) {
+export function taskRepository(
+  tasks: ReturnType<typeof taskModel>, projects: ReturnType<typeof projectModel>, activity: Pick<ActivityRepository, 'append'>,
+) {
+  async function updateManyWithActivity(
+    filter: QueryFilter<TaskRecord>, change: ActivityChange, actorId: string, session: ClientSession,
+  ) {
+    // The surrounding workspace lock keeps this set stable through the update and history insert.
+    const affected = await tasks.find(filter).select('_id').session(session).lean().exec()
+    if (!affected.length) return
+    const createdAt = new Date()
+    await tasks.updateMany(filter, { $set: {
+      [change.field]: change.to, updatedBy: actorId, updatedAt: createdAt,
+    } }, { session, timestamps: false }).exec()
+    await activity.append(affected.map(({ _id }) => ({
+      taskId: _id, actorId, action: 'TASK_UPDATED', changes: [change], completed: false, createdAt,
+    })), session)
+  }
+
   return {
     transaction<T>(operation: (session: ClientSession) => Promise<T>) {
       return tasks.db.transaction(operation)
@@ -66,8 +85,9 @@ export function taskRepository(tasks: ReturnType<typeof taskModel>, projects: Re
     },
 
     rollOverSprint(projectId: Types.ObjectId, from: string, to: string | null, actorId: string, session: ClientSession) {
-      return tasks.updateMany({ projectId, sprintId: from, status: { $ne: 'DONE' } },
-        { $set: { sprintId: to, updatedBy: actorId } }, { session }).exec()
+      return updateManyWithActivity(
+        { projectId, sprintId: from, status: { $ne: 'DONE' } }, { field: 'sprintId', from, to }, actorId, session,
+      )
     },
 
     update(id: string, userId: string, { dueDate, ...fields }: TaskUpdateInput['body'], session: ClientSession) {
@@ -88,16 +108,17 @@ export function taskRepository(tasks: ReturnType<typeof taskModel>, projects: Re
     },
 
     unassignInProject(projectId: string, assigneeId: string, actorId: string, session: ClientSession) {
-      return tasks.updateMany({ projectId, assigneeId }, { $set: { assigneeId: null, updatedBy: actorId } }, { session }).exec()
+      return updateManyWithActivity(
+        { projectId, assigneeId }, { field: 'assigneeId', from: assigneeId, to: null }, actorId, session,
+      )
     },
 
     async unassignInWorkspace(workspaceId: string, assigneeId: string, actorId: string, session: ClientSession) {
       const workspaceProjects = await projects.find({ workspaceId }).select('_id').session(session).lean().exec()
-      await tasks.updateMany(
+      await updateManyWithActivity(
         { projectId: { $in: workspaceProjects.map(({ _id }) => _id) }, assigneeId },
-        { $set: { assigneeId: null, updatedBy: actorId } },
-        { session },
-      ).exec()
+        { field: 'assigneeId', from: assigneeId, to: null }, actorId, session,
+      )
     },
   }
 }

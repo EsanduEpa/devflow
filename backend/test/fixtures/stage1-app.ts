@@ -10,7 +10,7 @@ import { createApp } from '../../src/app.js'
 import { authConfig } from '../../src/config/auth.js'
 import { connectDatabase } from '../../src/config/database.js'
 
-export async function startStage1App(purpose: 'browser' | 'performance' | 'sprint' | 'comment') {
+export async function startStage1App(purpose: 'browser' | 'performance' | 'sprint' | 'comment' | 'activity') {
   const uri = process.env.MONGODB_TEST_URI?.trim() || process.env.MONGODB_URI?.trim()
   if (!uri) throw new Error('Set MONGODB_TEST_URI or MONGODB_URI in backend/.env to run Stage 1 checks.')
 
@@ -23,6 +23,7 @@ export async function startStage1App(purpose: 'browser' | 'performance' | 'sprin
     task: { tasks: name('tasks') },
     sprint: { sprints: name('sprints') },
     comment: { comments: name('comments') },
+    activity: { activity: name('activity') },
   }
   const server = createServer()
 
