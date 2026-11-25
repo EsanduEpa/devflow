@@ -43,6 +43,7 @@ export function projectService(repository: ProjectRepository, workspaces: Worksp
 
   return {
     requireAccess,
+    listAccessUsers: repository.listAccessUsers,
     async isEligibleTaskAssignee(project: ProjectRecord, memberId: string, session: ClientSession) {
       const membership = await repository.hasMembership(project._id.toString(), memberId, session)
       return !!membership && !!await repository.isWorkspaceMember(project.workspaceId, memberId, session)

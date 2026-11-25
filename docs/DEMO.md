@@ -43,3 +43,16 @@ The [browser workflow](../backend/e2e/sprints.e2e.ts) rehearses these steps with
 ```sh
 npm --prefix backend run test:e2e -- sprints.e2e.ts
 ```
+
+## M18 comments walkthrough
+
+1. Open an editable task as a project member. In **Comments**, enter a review request and select another project member in **Mention someone**. Post the comment and confirm the mention appears under the text.
+2. Open the same task in the mentioned member’s session. Confirm they can read and reply. The original comment’s edit and delete controls are available to its author.
+3. In the author’s session, edit the text and remove the mention. Refresh the other session to see the edited text and updated mentions. Delete the original comment and verify the reply remains.
+4. Open the task link as a signed-in outsider. DevFlow denies access to the task and discussion.
+
+Run the [browser walkthrough](../backend/e2e/comments.e2e.ts) with isolated test data.
+
+```sh
+npm --prefix backend run test:e2e -- comments.e2e.ts
+```

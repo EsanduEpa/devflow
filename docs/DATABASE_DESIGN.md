@@ -1520,11 +1520,16 @@ The `one_active_sprint_per_project` partial unique index covers `projectId` on a
 
 Sprint mutations share the existing workspace write lock with archive, membership and task mutations. Completion calculates the snapshot, moves unfinished tasks and transitions the sprint in one transaction. The saved counts stay fixed if a previously Done task is reopened or deleted.
 
+## Implemented in M18
+
+The `comments` collection stores `taskId`, `authorId`, plain-text `body`, up to 20 distinct `mentionUserIds`, a `revision`, `introducedMentionUserIds`, and timestamps. The index `{ taskId: 1, createdAt: -1, _id: -1 }` keeps task-scoped pagination deterministic when timestamps tie.
+
+Comment mutations use the shared workspace write lock so project membership, archive status and parent-task checks stay valid through commit. Task deletion removes its comments within the same transaction. Each revision stores only the mention delta for that revision. The occurrence identity and later notification integration are recorded in the [M18 implementation notes](engineering-notes/012-m18-comment-verification.md).
+
 ## Future collections
 
 **Stage 2**
 
-- Comments.
 - Activity history.
 - Notifications.
 - Task dependencies.
