@@ -8,6 +8,8 @@ import { errorClass, successClass } from '../../shared/form-styles'
 import { Badge, ConfirmDialog, LoadingState, Modal, PageHeader } from '../../shared/ui'
 import { TaskActivity } from '../activity/TaskActivity'
 import { activityKey } from '../activity/api'
+import { TaskDependencies } from '../dependencies/TaskDependencies'
+import { dependencyKeys } from '../dependencies/api'
 import { TaskComments } from '../comments/TaskComments'
 import { getProject, listProjectMembers, projectKeys, type Project } from '../projects/api'
 import { listWorkspaceMembers, workspaceKeys } from '../workspaces/api'
@@ -45,6 +47,7 @@ function TaskPanel({ project, userId, task, drawer }: { project: Project; userId
       client.invalidateQueries({ queryKey: taskBoardKey(userId, project.id) }),
       client.invalidateQueries({ queryKey: ['tasks', userId, 'list', project.id] }),
       client.invalidateQueries({ queryKey: ['dashboard', userId, project.id] }),
+      client.invalidateQueries({ queryKey: dependencyKeys.project(userId, project.id) }),
     ])
   }
 
@@ -139,6 +142,8 @@ function TaskPanel({ project, userId, task, drawer }: { project: Project; userId
           {!task && !drawer && <Link className="ui-button ui-ghost mt-2" to={`${projectUrl}/board`}>Cancel</Link>}
         </section>
       )}
+      {task && !editing && <TaskDependencies taskId={task.id} projectId={project.id} userId={userId}
+        editable={canManage && editable} />}
       {task && !editing && <TaskActivity taskId={task.id} userId={userId} />}
       {task && !editing && <TaskComments taskId={task.id} projectId={project.id} userId={userId} editable={editable} />}
       {task && !editing && save.isSuccess && <p className={successClass} role="status">Changes saved.</p>}

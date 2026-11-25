@@ -117,3 +117,17 @@ Comment fields are `id`, `taskId`, `author: { id, name }`, `body`, `mentionUserI
 Each entry includes `id`, `taskId`, `actor: { id, name }`, `action`, `changes`, `completed`, and `createdAt`. Action is `TASK_CREATED` or `TASK_UPDATED`. A change has `field`, `from`, and `to`. Tracked fields are `assigneeId`, `priority`, `status` and `sprintId`. Reference changes also include nullable `fromLabel` and `toLabel`. An unavailable actor is represented by their ID and a null name.
 
 A creation entry contains the initial non-null tracked values. Updates record only actual changes, grouped in one entry per task and operation. A transition into `DONE` sets `completed: true` on that status entry. A task created in `DONE` has an initial Done status in its creation entry. Tasks created before M19 start with empty history. Permanent task deletion removes its timeline.
+
+## Task dependencies
+
+A dependency from A to B means A waits for B. Project readers can view dependencies, including on archived projects. Mutations require an editable project and its workspace Owner or assigned Manager.
+
+| Endpoint | Input | Success | Specific errors |
+| --- | --- | --- | --- |
+| `GET /tasks/:taskId/dependencies` | — | `200` with `{ prerequisites, dependents, blocked }` in `data` | `404 NOT_FOUND` |
+| `POST /tasks/:taskId/dependencies/:prerequisiteId` | Empty body or `{}` | `201` with `{ taskId, prerequisiteId }` in `data` | `400 VALIDATION_ERROR`, `403 FORBIDDEN`, `404 NOT_FOUND`, `409 INVALID_STATE`, `DEPENDENCY_EXISTS` or `DEPENDENCY_CYCLE` |
+| `DELETE /tasks/:taskId/dependencies/:prerequisiteId` | Empty body or `{}` | `204` | `400 VALIDATION_ERROR`, `403 FORBIDDEN`, `404 NOT_FOUND`, `409 INVALID_STATE` |
+
+Both task arrays contain `{ id, title, status }`, ordered by title then ID. `prerequisites` are tasks the current task waits for. `dependents` are tasks waiting for the current task. A task is blocked when at least one direct prerequisite has a status other than `DONE`. Completing or reopening a prerequisite changes the derived result. This indicator is informational and task status transitions follow their existing rules.
+
+Self-links and visible cross-project endpoints return `400`. An inaccessible or missing task returns `404`. A duplicate or cycle returns the corresponding `409` code. Permanently deleting a task removes dependency links in both directions.

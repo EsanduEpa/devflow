@@ -3,6 +3,7 @@ import { ApiError } from '../../shared/api-error.js'
 import type { ActivityRepository } from '../activity/activity.repository.js'
 import { recordTaskActivity } from '../activity/task-activity.js'
 import type { CommentRepository } from '../comments/comment.repository.js'
+import type { DependencyRepository } from '../dependencies/dependency.repository.js'
 import type { ProjectRecord } from '../projects/project.model.js'
 import type { ProjectService } from '../projects/project.service.js'
 import type { WorkspaceService } from '../workspaces/workspace.service.js'
@@ -18,7 +19,7 @@ function taskNotFound() {
 export function taskService(
   repository: TaskRepository, projects: ProjectService, workspaces: WorkspaceService,
   sprints: Pick<SprintRepository, 'find'>, comments: Pick<CommentRepository, 'removeForTask'>,
-  activity: Pick<ActivityRepository, 'append' | 'removeForTask'>,
+  activity: Pick<ActivityRepository, 'append' | 'removeForTask'>, dependencies: Pick<DependencyRepository, 'removeForTask'>,
 ) {
   async function requireTaskAccess(userId: string, taskId: string, session?: ClientSession) {
     const task = await repository.find(taskId, session)
@@ -118,11 +119,12 @@ export function taskService(
     },
 
     remove(userId: string, taskId: string) {
-      return manage(userId, taskId, async (_project, _task, session) => {
+      return manage(userId, taskId, async (project, _task, session) => {
         const result = await repository.remove(taskId, session)
         if (!result.deletedCount) throw taskNotFound()
         await comments.removeForTask(taskId, session)
         await activity.removeForTask(taskId, session)
+        await dependencies.removeForTask(project._id, taskId, session)
       })
     },
   }

@@ -9,7 +9,7 @@
     "build": "tsc",
     "start": "node --env-file=.env dist/server.js",
     "test": "vitest run --exclude '**/*.db.test.ts' --exclude '**/database.test.ts'",
-    "test:db": "node --env-file-if-exists=.env node_modules/vitest/vitest.mjs run test/database.test.ts test/auth.db.test.ts test/account.db.test.ts test/workspace.db.test.ts test/invitation.db.test.ts test/project.db.test.ts test/task.db.test.ts test/sprint.db.test.ts test/comment.db.test.ts test/activity.db.test.ts",
+    "test:db": "node --env-file-if-exists=.env node_modules/vitest/vitest.mjs run test/database.test.ts test/auth.db.test.ts test/account.db.test.ts test/workspace.db.test.ts test/invitation.db.test.ts test/project.db.test.ts test/task.db.test.ts test/sprint.db.test.ts test/comment.db.test.ts test/activity.db.test.ts test/dependency.db.test.ts",
     "test:e2e": "npm --prefix ../frontend run build && node --env-file-if-exists=.env node_modules/@playwright/test/cli.js test",
     "test:performance": "node --env-file-if-exists=.env --import=tsx test/performance.ts"
   },

@@ -213,16 +213,18 @@ The current `test:db` script lists its test files explicitly. Add each new datab
 
 **Outcome** Project members can see which tasks are blocked and which tasks they are waiting for. Invalid dependency links are rejected.
 
+**Evidence** [M20 verification](engineering-notes/014-m20-dependency-verification.md) · [Dependencies API](API_REFERENCE.md#task-dependencies) · [Demo](DEMO.md#m20-dependency-walkthrough)
+
 **Prerequisites** M16 and the task and activity foundations through M19.
 
 **Study and understand** Directed graphs, graph traversal, and consistency checks under overlapping writes.
 
 **Steps to complete**
 
-1. [ ] Define edge direction consistently. In this guide, `A → B` means A waits for B. Define who may modify links, same-project eligibility, and what counts as a resolved prerequisite.
-2. [ ] Implement add, remove, and list operations. Reject invalid endpoints, duplicates, self-links, and edges that close a direct or indirect cycle. To validate `A → B`, search from B for a path back to A.
-3. [ ] Protect cycle checks against two simultaneous writes by enforcing the graph check and write under a shared project consistency boundary. Handle dependency cleanup when tasks are deleted.
-4. [ ] Show prerequisites, dependent tasks, and blocked status in task details. Use the same definition of blocked in M25 filters and dashboard counts.
+1. [x] Define edge direction consistently. In this guide, `A → B` means A waits for B. Define who may modify links, same-project eligibility, and what counts as a resolved prerequisite.
+2. [x] Implement add, remove, and list operations. Reject invalid endpoints, duplicates, self-links, and edges that close a direct or indirect cycle. To validate `A → B`, search from B for a path back to A.
+3. [x] Protect cycle checks against two simultaneous writes by enforcing the graph check and write under a shared project consistency boundary. Handle dependency cleanup when tasks are deleted.
+4. [x] Show prerequisites, dependent tasks, and blocked status in task details. Use the same definition of blocked in M25 filters and dashboard counts.
 
 **Verify and test** Add `A → B` and `B → C`, then attempt `C → A`. Attempt concurrent reverse links, foreign-project links, and duplicates. Verify what happens when a prerequisite is completed, reopened, or deleted.
 
