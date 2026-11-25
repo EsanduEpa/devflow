@@ -5,20 +5,23 @@ import { ApiError, apiErrorMessage } from '../../shared/api'
 import { errorClass, fieldClass, linkClass } from '../../shared/form-styles'
 import { Badge, LoadingState, PageHeader } from '../../shared/ui'
 import { projectKeys, type Project } from '../projects/api'
-import { listTaskPage } from '../tasks/api'
+import { TaskConflictNotice } from '../tasks/TaskConflictNotice'
+import { isTaskConflict, useTaskConflict } from '../tasks/useTaskConflict'
+import { listTaskPage, type Task } from '../tasks/api'
 import { taskStatusLabels, taskStatusTones } from '../tasks/task-labels'
 import { workspaceKeys } from '../workspaces/api'
 import { changeSprintState, changeSprintTask, getSprint, listSprints, sprintKeys, type Sprint } from './api'
 import { Pager, SprintBadge, SprintDates, SprintLoadError } from './sprint-ui'
 
-type SprintAction = { type: 'start' } | { type: 'complete'; target: string | null } | { type: 'add' | 'remove'; taskId: string }
+type MembershipAction = { type: 'add' | 'remove'; taskId: string; version: number }
+type SprintAction = { type: 'start' } | { type: 'complete'; target: string | null } | MembershipAction
 
 function SprintTaskList({ sprint, userId, available, unfinished, action, pending }: {
   sprint: Sprint
   userId: string
   available?: boolean
   unfinished?: boolean
-  action?: (taskId: string) => void
+  action?: (task: Task) => void
   pending: boolean
 }) {
   const [page, setPage] = useState(1)
@@ -42,7 +45,7 @@ function SprintTaskList({ sprint, userId, available, unfinished, action, pending
         <Link to={`/tasks/${task.id}`} className={`${linkClass} min-w-0 flex-1 basis-40 break-words`}>{task.title}</Link>
         <Badge tone={taskStatusTones[task.status]}>{taskStatusLabels[task.status]}</Badge>
         {action && <button type="button" className="ui-button ui-secondary"
-          aria-label={`${actionLabel} ${task.title}`} disabled={pending} onClick={() => action(task.id)}>{actionLabel}</button>}
+          aria-label={`${actionLabel} ${task.title}`} disabled={pending} onClick={() => action(task)}>{actionLabel}</button>}
       </li>)}
     </ul>
     <Pager page={page} total={list.data.pagination.totalPages} onPage={setPage} />
@@ -100,21 +103,24 @@ function SprintContent({ sprint, project, userId, canManage }: { sprint: Sprint;
   const [completing, setCompleting] = useState(false)
   const [showAvailable, setShowAvailable] = useState(false)
   const [unfinished, setUnfinished] = useState(false)
+  const conflict = useTaskConflict<MembershipAction>()
   const change = useMutation({
     mutationFn: (action: SprintAction) => {
       if (action.type === 'start') return changeSprintState(sprint.id, 'start')
       if (action.type === 'complete') return changeSprintState(sprint.id, 'complete', action.target)
-      return changeSprintTask(sprint.id, action.taskId, action.type === 'add')
+      return changeSprintTask(sprint.id, action.taskId, action.type === 'add', action.version)
     },
     onSuccess: (_data, action) => {
+      conflict.clear()
       if (action.type === 'complete') {
         setCompleting(false)
         setUnfinished(false)
       }
     },
+    onError: (error, action) => { if ('taskId' in action) conflict.capture(error, action.taskId, action) },
     onSettled: async (_data, error) => {
       const refresh = [client.invalidateQueries({ queryKey: sprintKeys.project(userId, project.id) })]
-      if (!error) refresh.push(client.invalidateQueries({ queryKey: ['tasks', userId] }))
+      if (!error || isTaskConflict(error)) refresh.push(client.invalidateQueries({ queryKey: ['tasks', userId] }))
       if (error instanceof ApiError && [403, 404, 409].includes(error.status)) {
         refresh.push(
           client.invalidateQueries({ queryKey: projectKeys.details(userId, project.id) }),
@@ -125,6 +131,10 @@ function SprintContent({ sprint, project, userId, canManage }: { sprint: Sprint;
     },
   })
   const editMembership = canManage && sprint.status !== 'COMPLETED'
+  const attempt = conflict.attempt?.intent
+  const latest = conflict.current
+  const canRetryMembership = editMembership && latest && attempt
+    && (attempt.type === 'add' ? latest.sprintId === null : latest.sprintId === sprint.id)
   const { completedTasks, totalTasks, unfinishedTasks, completionPercentage } = sprint.progress
 
   return <>
@@ -135,7 +145,24 @@ function SprintContent({ sprint, project, userId, canManage }: { sprint: Sprint;
         onClick={() => { setCompleting(true); setUnfinished(true); change.reset() }}>Complete sprint</button>}
     </>} />
     <SprintDates sprint={sprint} />
-    {change.isError && <p role="alert" className={errorClass}>{apiErrorMessage(change.error)}</p>}
+    {change.isError && !isTaskConflict(change.error) && <p role="alert" className={errorClass}>{apiErrorMessage(change.error)}</p>}
+    {attempt && <TaskConflictNotice message="Review the latest task before retrying the sprint change."
+      pending={conflict.pending} error={conflict.error} reload={conflict.reload}>
+      {latest && <p className="text-sm text-ink">
+        <strong>{latest.title}</strong> is {taskStatusLabels[latest.status]} and currently in {latest.sprintId === sprint.id
+          ? sprint.name : latest.sprintId ? 'another sprint' : 'the project backlog'}.
+      </p>}
+      <div className="flex flex-wrap gap-2">
+        {canRetryMembership && <button type="button" className="ui-button ui-primary" disabled={change.isPending}
+          onClick={() => change.mutate({ ...attempt, version: latest.version })}>
+          {attempt.type === 'add' ? 'Retry adding task' : 'Retry removing task'}
+        </button>}
+        <button type="button" className="ui-button ui-secondary" disabled={change.isPending} onClick={() => {
+          conflict.clear()
+          change.reset()
+        }}>Dismiss sprint change</button>
+      </div>
+    </TaskConflictNotice>}
     {project.status === 'ARCHIVED' && <p className="text-sm text-secondary">Restore this project to change its sprints.</p>}
     <section className="ui-panel space-y-2" aria-label="Sprint progress">
       <h2 className="text-lg font-semibold">{sprint.status === 'COMPLETED' ? 'Progress at completion' : 'Sprint progress'}</h2>
@@ -152,14 +179,14 @@ function SprintContent({ sprint, project, userId, canManage }: { sprint: Sprint;
           <input type="checkbox" checked={unfinished} onChange={(event) => setUnfinished(event.target.checked)} />Unfinished only
         </label>
       </div>
-      <SprintTaskList key={String(unfinished)} sprint={sprint} userId={userId} pending={change.isPending} unfinished={unfinished}
-        action={editMembership ? (taskId) => change.mutate({ type: 'remove', taskId }) : undefined} />
+      <SprintTaskList key={String(unfinished)} sprint={sprint} userId={userId} pending={change.isPending || !!attempt} unfinished={unfinished}
+        action={editMembership ? (task) => change.mutate({ type: 'remove', taskId: task.id, version: task.version }) : undefined} />
     </section>
     {editMembership && <section className="ui-panel space-y-3">
       <button className="ui-button ui-secondary" type="button" aria-expanded={showAvailable}
         onClick={() => setShowAvailable(!showAvailable)}>{showAvailable ? 'Hide unscheduled tasks' : 'Add tasks'}</button>
-      {showAvailable && <SprintTaskList sprint={sprint} userId={userId} available pending={change.isPending}
-        action={(taskId) => change.mutate({ type: 'add', taskId })} />}
+      {showAvailable && <SprintTaskList sprint={sprint} userId={userId} available pending={change.isPending || !!attempt}
+        action={(task) => change.mutate({ type: 'add', taskId: task.id, version: task.version })} />}
     </section>}
   </>
 }

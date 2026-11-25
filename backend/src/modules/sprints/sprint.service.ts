@@ -5,6 +5,7 @@ import { recordTaskActivity } from '../activity/task-activity.js'
 import type { PageRequest } from '../../shared/pagination.js'
 import type { ProjectRecord } from '../projects/project.model.js'
 import type { ProjectService } from '../projects/project.service.js'
+import { staleTaskVersion } from '../tasks/task-version.js'
 import { publicTask } from '../tasks/task.model.js'
 import type { TaskRepository } from '../tasks/task.repository.js'
 import type { WorkspaceService } from '../workspaces/workspace.service.js'
@@ -52,7 +53,7 @@ export function sprintService(
     return publicSprint(sprint, counts.get(sprint._id.toString()))
   }
 
-  async function changeMembership(userId: string, id: string, taskId: string, add: boolean) {
+  async function changeMembership(userId: string, id: string, taskId: string, add: boolean, expectedVersion?: number) {
     return manage(userId, id, async (sprint, session) => {
       if (sprint.status === 'COMPLETED') throw invalidState('Completed sprint membership cannot be changed.')
       const task = await tasks.find(taskId, session)
@@ -64,11 +65,13 @@ export function sprintService(
         })
         throw invalidSelection('params.taskId', 'Choose a task from this sprint’s project.')
       }
+      if (expectedVersion !== undefined && expectedVersion !== (task.version ?? 0)) throw staleTaskVersion()
       const current = task.sprintId?.toString() ?? null
       if (add && current === id) return publicTask(task)
       if (add && current !== null) throw invalidState('Remove this task from its current sprint first.')
       if (!add && current !== id) throw new ApiError(404, 'NOT_FOUND', 'The task is not in this sprint.')
-      const updated = await tasks.changeSprint(taskId, current, add ? id : null, userId, session)
+      const updated = await tasks.changeSprint(taskId, current, add ? id : null, userId, session, expectedVersion)
+      if (!updated && expectedVersion !== undefined) throw staleTaskVersion()
       if (!updated) throw invalidState('The task’s sprint changed. Refresh and try again.')
       await recordTaskActivity(activity, updated, userId, task, session)
       return publicTask(updated)
@@ -138,8 +141,8 @@ export function sprintService(
       })
     },
 
-    addTask: (userId: string, id: string, taskId: string) => changeMembership(userId, id, taskId, true),
-    removeTask: (userId: string, id: string, taskId: string) => changeMembership(userId, id, taskId, false),
+    addTask: (userId: string, id: string, taskId: string, expectedVersion?: number) => changeMembership(userId, id, taskId, true, expectedVersion),
+    removeTask: (userId: string, id: string, taskId: string, expectedVersion?: number) => changeMembership(userId, id, taskId, false, expectedVersion),
   }
 }
 

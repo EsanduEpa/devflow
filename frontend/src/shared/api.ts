@@ -1,11 +1,13 @@
 export class ApiError extends Error {
   readonly status: number
+  readonly code?: string
   readonly fields: Record<string, string>
 
-  constructor(status: number, message: string, fields: Record<string, string> = {}) {
+  constructor(status: number, message: string, fields: Record<string, string> = {}, code?: string) {
     super(message)
     this.status = status
     this.fields = fields
+    this.code = code
   }
 }
 
@@ -27,7 +29,7 @@ export async function apiRequest(path: string, init?: RequestInit) {
     if (response.status === 401 && error?.code === 'UNAUTHENTICATED') {
       window.dispatchEvent(new Event('devflow:session-ended'))
     }
-    throw new ApiError(response.status, fieldMessage ?? error?.message ?? 'DevFlow could not complete this request.', fields)
+    throw new ApiError(response.status, fieldMessage ?? error?.message ?? 'DevFlow could not complete this request.', fields, error?.code)
   }
   return response
 }

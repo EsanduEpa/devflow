@@ -1540,6 +1540,10 @@ Dependency changes and incident-edge cleanup reuse the shared workspace write lo
 
 Blocked state is derived from current direct prerequisites. At least one direct prerequisite outside `DONE` makes the task blocked. M25 filters and dashboard counts use this same predicate.
 
+## Implemented in M21
+
+Tasks store a `version` that starts at zero. Existing tasks with no stored version match version zero. Version-aware edits, moves and direct sprint membership writes use a single update predicate for the task ID and expected version, and increment the version in the same write. Older clients omit the predicate and still increment the version. Bulk sprint rollover and membership-driven unassignment increment each affected task version in the transaction that updates its fields and records activity.
+
 ## Future collections
 
 **Stage 2**

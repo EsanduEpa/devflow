@@ -13,9 +13,12 @@ const taskFields = {
   dueDate: z.iso.date().nullable().optional(),
 }
 
+export const taskVersionSchema = z.int().nonnegative()
+const expectedVersion = taskVersionSchema.optional()
+
 export const taskDetailsSchema = details
 export const taskCreateSchema = details.extend({ body: z.strictObject({ ...taskFields, status: z.enum(taskStatuses).optional() }) })
-export const taskStatusSchema = details.extend({ body: z.strictObject({ status: z.enum(taskStatuses) }) })
+export const taskStatusSchema = details.extend({ body: z.strictObject({ status: z.enum(taskStatuses), expectedVersion }) })
 export const taskListSchema = details.extend({
   query: z.strictObject({
     ...paginationFields,
@@ -31,7 +34,7 @@ export const taskListSchema = details.extend({
     }),
 })
 export const taskUpdateSchema = details.extend({
-  body: z.strictObject(taskFields).partial().refine((fields) => Object.keys(fields).length > 0, {
+  body: z.strictObject({ ...taskFields, expectedVersion }).partial().refine(({ expectedVersion: _, ...fields }) => Object.keys(fields).length > 0, {
     message: 'Provide at least one task field to update.',
   }),
 })
@@ -39,5 +42,6 @@ export const taskUpdateSchema = details.extend({
 export type TaskDetailsInput = z.infer<typeof taskDetailsSchema>
 export type TaskCreateInput = z.infer<typeof taskCreateSchema>
 export type TaskUpdateInput = z.infer<typeof taskUpdateSchema>
+export type TaskUpdateFields = Omit<TaskUpdateInput['body'], 'expectedVersion'>
 export type TaskStatusInput = z.infer<typeof taskStatusSchema>
 export type TaskListInput = z.infer<typeof taskListSchema>

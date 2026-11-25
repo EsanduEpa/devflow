@@ -5,6 +5,7 @@ export const taskStatuses = ['BACKLOG', 'TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DON
 export type TaskStatus = typeof taskStatuses[number]
 
 const taskSchema = new Schema({
+  version: { type: Number, default: 0, required: true, min: 0 },
   projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, immutable: true },
   sprintId: { type: Schema.Types.ObjectId, ref: 'Sprint', default: null },
   title: { type: String, trim: true, minlength: 3, maxlength: 200, required: true },
@@ -32,6 +33,7 @@ export function taskModel(connection: Connection, collection = 'tasks') {
 export type TaskRecord = {
   _id: Types.ObjectId
   projectId: Types.ObjectId
+  version?: number
   sprintId?: Types.ObjectId | null
   title: string
   description?: string | null
@@ -49,6 +51,7 @@ export function publicTask(task: TaskRecord) {
   return {
     id: task._id.toString(),
     projectId: task.projectId.toString(),
+    version: task.version ?? 0,
     sprintId: task.sprintId?.toString() ?? null,
     title: task.title,
     description: task.description ?? '',
