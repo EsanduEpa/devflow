@@ -9,6 +9,7 @@ import type { ProjectService } from '../projects/project.service.js'
 import type { WorkspaceService } from '../workspaces/workspace.service.js'
 import type { SprintRepository } from '../sprints/sprint.repository.js'
 import { publicTask, type TaskRecord, type TaskStatus } from './task.model.js'
+import { staleTaskVersion } from './task-version.js'
 import type { TaskRepository } from './task.repository.js'
 import type { TaskCreateInput, TaskListInput, TaskUpdateInput } from './task.schemas.js'
 
@@ -89,7 +90,7 @@ export function taskService(
       }
     },
 
-    changeStatus(userId: string, taskId: string, status: TaskStatus) {
+    changeStatus(userId: string, taskId: string, status: TaskStatus, expectedVersion?: number) {
       return repository.transaction(async (session) => {
         const { task, project, canManage, myRole } = await requireTaskAccess(userId, taskId, session)
         if (!canManage) {
@@ -101,18 +102,18 @@ export function taskService(
           }
         }
         await lockEditableProject(project, session)
-        const updated = await repository.updateStatus(taskId, userId, status, session)
-        if (!updated) throw taskNotFound()
+        const updated = await repository.updateStatus(taskId, userId, status, session, expectedVersion)
+        if (!updated) throw expectedVersion === undefined ? taskNotFound() : staleTaskVersion()
         await recordTaskActivity(activity, updated, userId, task, session)
         return publicTask(updated)
       })
     },
 
-    update(userId: string, taskId: string, fields: TaskUpdateInput['body']) {
+    update(userId: string, taskId: string, { expectedVersion, ...fields }: TaskUpdateInput['body']) {
       return manage(userId, taskId, async (project, task, session) => {
         await validateAssignee(project, fields.assigneeId, session)
-        const updated = await repository.update(taskId, userId, fields, session)
-        if (!updated) throw taskNotFound()
+        const updated = await repository.update(taskId, userId, fields, session, expectedVersion)
+        if (!updated) throw expectedVersion === undefined ? taskNotFound() : staleTaskVersion()
         await recordTaskActivity(activity, updated, userId, task, session)
         return publicTask(updated)
       })

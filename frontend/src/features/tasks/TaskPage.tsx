@@ -15,6 +15,8 @@ import { getProject, listProjectMembers, projectKeys, type Project } from '../pr
 import { listWorkspaceMembers, workspaceKeys } from '../workspaces/api'
 import { formatDate } from '../workspaces/workspace-labels'
 import { createTask, deleteTask, getTask, taskBoardKey, taskKey, updateTask, type Task, type TaskChanges, type TaskFields } from './api'
+import { TaskConflictNotice } from './TaskConflictNotice'
+import { useTaskConflict, isTaskConflict } from './useTaskConflict'
 import { TaskForm } from './TaskForm'
 import { TaskStatusControl } from './TaskStatusControl'
 import { taskPriorityLabels, taskPriorityTones, taskStatusLabels, taskStatusTones } from './task-labels'
@@ -24,7 +26,9 @@ function TaskPanel({ project, userId, task, drawer }: { project: Project; userId
   const navigate = useNavigate()
   const location = useLocation()
   const client = useQueryClient()
-  const [editing, setEditing] = useState(false)
+  const [editBase, setEditBase] = useState<Task | null>(null)
+  const editing = editBase !== null
+  const conflict = useTaskConflict<undefined>()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const projectUrl = `/projects/${project.id}`
   const workspaceMembers = useQuery({
@@ -54,15 +58,20 @@ function TaskPanel({ project, userId, task, drawer }: { project: Project; userId
   const save = useMutation({
     mutationFn: (fields: TaskFields) => {
       if (!task) return createTask(project.id, fields)
+      if (!editBase) return Promise.resolve(task)
       const patch: TaskChanges = {
-        ...(fields.title !== task.title && { title: fields.title }),
-        ...(fields.description !== task.description && { description: fields.description }),
-        ...(fields.assigneeId !== undefined && fields.assigneeId !== task.assigneeId && { assigneeId: fields.assigneeId }),
-        ...(fields.priority !== undefined && fields.priority !== task.priority && { priority: fields.priority }),
-        ...(fields.dueDate !== undefined && fields.dueDate !== task.dueDate && { dueDate: fields.dueDate }),
+        ...(fields.title !== editBase.title && { title: fields.title }),
+        ...(fields.description !== editBase.description && { description: fields.description }),
+        ...(fields.assigneeId !== undefined && fields.assigneeId !== editBase.assigneeId && { assigneeId: fields.assigneeId }),
+        ...(fields.priority !== undefined && fields.priority !== editBase.priority && { priority: fields.priority }),
+        ...(fields.dueDate !== undefined && fields.dueDate !== editBase.dueDate && { dueDate: fields.dueDate }),
       }
-      return Object.keys(patch).length ? updateTask(task.id, patch) : Promise.resolve(task)
+      const current = conflict.current ?? editBase
+      return Object.keys(patch).length ? updateTask(task.id, patch, current.version) : Promise.resolve(
+        current.version >= task.version ? current : task,
+      )
     },
+    onError: (error) => { if (task) conflict.capture(error, task.id, undefined) },
     onSuccess: async (updated) => {
       client.setQueryData(taskKey(userId, updated.id), updated)
       await Promise.all([refreshProjectTasks(), client.invalidateQueries({ queryKey: activityKey(userId, updated.id) })])
@@ -76,7 +85,10 @@ function TaskPanel({ project, userId, task, drawer }: { project: Project; userId
 
   function saveTask(fields: TaskFields) {
     save.mutate(fields, { onSuccess: (updated) => {
-      if (task) setEditing(false)
+      if (task) {
+        setEditBase(null)
+        conflict.clear()
+      }
       else void navigate(`/tasks/${updated.id}`, { replace: true, state: drawer ? { taskBackground: taskBackground(location) } : undefined })
     } })
   }
@@ -108,7 +120,7 @@ function TaskPanel({ project, userId, task, drawer }: { project: Project; userId
             <TaskStatusControl task={task} project={project} userId={userId} role={role} />
           </section>
           {canManage && editable && <div className="flex flex-wrap gap-2">
-            <button className="ui-button ui-secondary" onClick={() => { save.reset(); setEditing(true) }}><Pencil size={15} aria-hidden="true" />Edit task</button>
+            <button className="ui-button ui-secondary" onClick={() => { save.reset(); conflict.clear(); setEditBase(task) }}><Pencil size={15} aria-hidden="true" />Edit task</button>
             <button className="ui-button ui-danger" onClick={() => { remove.reset(); setConfirmDelete(true) }}><Trash2 size={15} aria-hidden="true" />Delete task</button>
           </div>}
           {canManage && editable && confirmDelete && <ConfirmDialog title="Delete task?" pending={remove.isPending}
@@ -134,11 +146,38 @@ function TaskPanel({ project, userId, task, drawer }: { project: Project; userId
             <p className={errorClass} role="alert">{apiErrorMessage(projectMembers.error)}</p>
             <button className="ui-button ui-secondary mt-2" onClick={() => void projectMembers.refetch()}>Retry loading assignees</button>
           </div>}
-          <TaskForm key={task?.id ?? project.id} task={task} canManage={canManage}
+          {conflict.attempt && <TaskConflictNotice message="Your draft is still in the form. Review the saved values before retrying your changes."
+            pending={conflict.pending} error={conflict.error} reload={conflict.reload}>
+            {conflict.current && <div className="space-y-3 text-sm">
+              <h4 className="font-semibold">Latest saved values</h4>
+              <dl className="grid gap-2 break-words sm:grid-cols-2">
+                <div><dt className="text-secondary">Task title</dt><dd>{conflict.current.title}</dd></div>
+                <div><dt className="text-secondary">Status</dt><dd>{taskStatusLabels[conflict.current.status]}</dd></div>
+                <div><dt className="text-secondary">Priority</dt><dd>{taskPriorityLabels[conflict.current.priority]}</dd></div>
+                <div><dt className="text-secondary">Assignee</dt><dd>{conflict.current.assigneeId ? memberName(conflict.current.assigneeId) : 'Unassigned'}</dd></div>
+                <div><dt className="text-secondary">Due date</dt><dd>{formatDateOnly(conflict.current.dueDate)}</dd></div>
+                <div className="sm:col-span-2"><dt className="text-secondary">Description</dt><dd className="whitespace-pre-wrap">{conflict.current.description || 'None'}</dd></div>
+              </dl>
+              <button type="button" className="ui-button ui-secondary" disabled={save.isPending} onClick={() => {
+                if (!conflict.current) return
+                setEditBase(conflict.current)
+                client.setQueryData(taskKey(userId, conflict.current.id), conflict.current)
+                save.reset()
+                conflict.clear()
+              }}>Replace draft with latest values</button>
+            </div>}
+          </TaskConflictNotice>}
+          <TaskForm key={editBase ? `${editBase.id}:${editBase.version}` : project.id} task={editBase ?? undefined} canManage={canManage}
+            submitLabel={conflict.attempt ? 'Retry my changes' : undefined} submitBlocked={!!conflict.attempt && !conflict.current}
             members={projectMembers.isSuccess ? projectMembers.data : undefined} error={save.error}
             pending={save.isPending || (canManage && projectMembers.isPending)} onSave={saveTask} />
-          {save.error && <p className={`mt-3 ${errorClass}`} role="alert">{apiErrorMessage(save.error)}</p>}
-          {task && <button className="ui-button ui-ghost mt-2" disabled={save.isPending} onClick={() => setEditing(false)}>Cancel editing</button>}
+          {save.error && !isTaskConflict(save.error) && <p className={`mt-3 ${errorClass}`} role="alert">{apiErrorMessage(save.error)}</p>}
+          {task && <button className="ui-button ui-ghost mt-2" disabled={save.isPending} onClick={() => {
+            if (conflict.current) client.setQueryData(taskKey(userId, task.id), conflict.current)
+            setEditBase(null)
+            conflict.clear()
+            save.reset()
+          }}>Cancel editing</button>}
           {!task && !drawer && <Link className="ui-button ui-ghost mt-2" to={`${projectUrl}/board`}>Cancel</Link>}
         </section>
       )}

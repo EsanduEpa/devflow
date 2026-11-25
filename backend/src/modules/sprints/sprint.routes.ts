@@ -44,11 +44,11 @@ export function createSprintRoutes(service: SprintService, { requireUser, verify
   })
   route('post', '/sprints/:sprintId/tasks/:taskId', sprintMembership, async (_request, response) => {
     const { user, input } = response.locals
-    response.json({ data: await service.addTask(user.id, input.params.sprintId, input.params.taskId) })
+    response.json({ data: await service.addTask(user.id, input.params.sprintId, input.params.taskId, input.query.expectedVersion) })
   })
   route('delete', '/sprints/:sprintId/tasks/:taskId', sprintMembership, async (_request, response) => {
     const { user, input } = response.locals
-    await service.removeTask(user.id, input.params.sprintId, input.params.taskId)
+    await service.removeTask(user.id, input.params.sprintId, input.params.taskId, input.query.expectedVersion)
     response.status(204).end()
   })
 

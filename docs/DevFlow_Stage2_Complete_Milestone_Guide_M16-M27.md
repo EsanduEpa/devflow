@@ -240,16 +240,18 @@ The current `test:db` script lists its test files explicitly. Add each new datab
 
 **Outcome** Stage 2 edits detect stale data and help the user recover without silently overwriting another person's change.
 
+**Evidence** [M21 verification](engineering-notes/015-m21-conflict-verification.md) · [Conflict API](API_REFERENCE.md#task-write-conflicts) · [Demo](DEMO.md#m21-conflict-walkthrough)
+
 **Prerequisites** M17–M20 and the write contracts mapped in M16.
 
 **Study and understand** Optimistic concurrency, conditional database updates, and conflict recovery.
 
 **Steps to complete**
 
-1. [ ] Define a version for each editable resource covered by the conflict contract. A task version and expected version on task edits and moves are the proposed starting point. Document how a request from a Stage 1 client and a record with no version are handled.
-2. [ ] Compare the expected version and save the update atomically. Ensure writers that affect the same versioned resource increment the same version.
-3. [ ] Return a documented conflict response. Update the frontend to present the current server state, preserve the user's draft where possible, and let them retry intentionally.
-4. [ ] Verify that failed conflicts leave no activity or other side effects. Keep existing ownership and transition checks in the write path.
+1. [x] Define a version for each editable resource covered by the conflict contract. A task version and expected version on task edits and moves are the proposed starting point. Document how a request from a Stage 1 client and a record with no version are handled.
+2. [x] Compare the expected version and save the update atomically. Ensure writers that affect the same versioned resource increment the same version.
+3. [x] Return a documented conflict response. Update the frontend to present the current server state, preserve the user's draft where possible, and let them retry intentionally.
+4. [x] Verify that failed conflicts leave no activity or other side effects. Keep existing ownership and transition checks in the write path.
 
 **Verify and test** Open the same task in two sessions, make a change in one, then save a stale edit in the other. Send two writes with the same version concurrently and confirm that only one succeeds.
 

@@ -2,6 +2,8 @@ import { z } from 'zod'
 import { objectId } from '../../shared/object-id.js'
 import { hasSafePageOffset, paginationFields } from '../../shared/pagination.js'
 
+import { taskVersionSchema } from '../tasks/task.schemas.js'
+
 const id = objectId.transform((value) => value.toLowerCase())
 const query = z.strictObject({})
 const emptyBody = z.strictObject({}).optional()
@@ -11,6 +13,10 @@ export const sprintDetails = z.object({ params: z.strictObject({ sprintId: id })
 export const sprintStart = sprintDetails.extend({ body: emptyBody })
 export const sprintMembership = sprintDetails.extend({
   params: sprintDetails.shape.params.extend({ taskId: id }),
+  query: z.strictObject({
+    expectedVersion: z.string().regex(/^\d+$/, 'Enter a non-negative whole number.')
+      .transform(Number).pipe(taskVersionSchema).optional(),
+  }),
   body: emptyBody,
 })
 export const sprintList = project.extend({

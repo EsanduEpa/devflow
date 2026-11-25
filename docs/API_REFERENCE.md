@@ -68,15 +68,23 @@ Project fields are `id`, `workspaceId`, `name`, `description`, `managerId`, `sta
 | `POST /projects/:id/tasks` | Project access | Required `title`. Optional `description`. Owners and assigned Managers may also set `assigneeId`, `priority`, `status`, `dueDate` | `201` Task | `400` for an ineligible assignee, `403 FORBIDDEN` for management fields without permission, `404 NOT_FOUND`, `409 INVALID_STATE` on archived projects |
 | `GET /projects/:id/tasks` | Project access | Optional `status`, `priority`, `assigneeId`, `search`, `sprintId`, `unfinished`, `page`, `limit` | `200` Paginated task array | `404 NOT_FOUND` |
 | `GET /tasks/:id` | Project access | — | `200` Task | `404 NOT_FOUND` |
-| `PATCH /tasks/:id` | Workspace Owner or assigned Project Manager | At least one of `title`, `description`, `assigneeId`, `priority`, `dueDate` | `200` Updated task | `400` for an ineligible assignee, `403 FORBIDDEN`, `404 NOT_FOUND`, `409 INVALID_STATE` on archived projects |
-| `PATCH /tasks/:id/status` | Workspace Owner, assigned Project Manager, or assigned Developer within the status rules | `status` | `200` Updated task | `403 FORBIDDEN` for disallowed transitions or unassigned Developers, `404 NOT_FOUND`, `409 INVALID_STATE` on archived projects |
+| `PATCH /tasks/:id` | Workspace Owner or assigned Project Manager | At least one of `title`, `description`, `assigneeId`, `priority`, `dueDate`. Optional `expectedVersion` | `200` Updated task | `400` for an ineligible assignee, `403 FORBIDDEN`, `404 NOT_FOUND`, `409 INVALID_STATE` on archived projects, `409 STALE_VERSION` |
+| `PATCH /tasks/:id/status` | Workspace Owner, assigned Project Manager, or assigned Developer within the status rules | `status`, optional `expectedVersion` | `200` Updated task | `403 FORBIDDEN` for disallowed transitions or unassigned Developers, `404 NOT_FOUND`, `409 INVALID_STATE` on archived projects, `409 STALE_VERSION` |
 | `DELETE /tasks/:id` | Workspace Owner or assigned Project Manager | — | `204`, permanently removes task | `403 FORBIDDEN`, `404 NOT_FOUND`, `409 INVALID_STATE` on archived projects |
 
-Task fields are `id`, `projectId`, `sprintId`, `title`, `description`, `assigneeId`, `priority`, `status`, `dueDate`, `createdBy`, `updatedBy`, `createdAt`, and `updatedAt`. Titles are 3–200 characters and descriptions are up to 5,000. `sprintId`, `assigneeId`, `dueDate`, and `updatedBy` can be `null`. Older tasks without a stored sprint ID are returned with `sprintId: null`. Defaults are `BACKLOG`, `MEDIUM`, no assignee, and no due date. Priorities are `LOW`, `MEDIUM`, `HIGH`, `URGENT`. Statuses are `BACKLOG`, `TODO`, `IN_PROGRESS`, `IN_REVIEW`, `DONE`. Assigned Developers can update their own unfinished tasks to any of the first four statuses. Owners and assigned Managers can approve or reopen `DONE` tasks.
+Task fields are `id`, `projectId`, `version`, `sprintId`, `title`, `description`, `assigneeId`, `priority`, `status`, `dueDate`, `createdBy`, `updatedBy`, `createdAt`, and `updatedAt`. Titles are 3–200 characters and descriptions are up to 5,000. `sprintId`, `assigneeId`, `dueDate`, and `updatedBy` can be `null`. Older tasks without a stored sprint ID are returned with `sprintId: null`. Defaults are `BACKLOG`, `MEDIUM`, no assignee, and no due date. Priorities are `LOW`, `MEDIUM`, `HIGH`, `URGENT`. Statuses are `BACKLOG`, `TODO`, `IN_PROGRESS`, `IN_REVIEW`, `DONE`. Assigned Developers can update their own unfinished tasks to any of the first four statuses. Owners and assigned Managers can approve or reopen `DONE` tasks.
 
 Project and task lists default to page `1` and limit `20`, with a maximum limit of `100`. Lists sort newest first by `createdAt` and ID. Task filters combine within a single authorized project. `assigneeId` accepts a full user ID or `unassigned`. `search` allows up to 200 characters and matches a full task ID or words in the title.
 
 `sprintId` on the task list accepts a sprint in the project or `none` for unscheduled tasks. A sprint ID outside the current project returns `404 NOT_FOUND`. Set `unfinished=true` with a specific sprint ID to exclude Done tasks before pagination. `unfinished` and `status` are mutually exclusive.
+
+### Task write conflicts
+
+Task responses include a non-negative integer `version`. A task with no stored version is read as `0`. A client can send the version it read as `expectedVersion` in an edit or status PATCH body, or as a decimal query parameter on a sprint membership POST or DELETE.
+
+When the version no longer matches, an otherwise permitted write returns `409` with `error.code` set to `STALE_VERSION`. Refetch `GET /tasks/:id` under the current session, show the latest values, and use that version on an intentional retry. A rejected stale write leaves the task and activity unchanged. Authorization, archive and transition checks still apply.
+
+Clients that omit `expectedVersion` retain the existing write behavior. Successful patches increment the version, including patches from those clients. Sprint membership changes, rollover and membership-driven unassignment also increment the affected task versions. Repeating an add to the task’s current sprint at the current version returns the existing task.
 
 ## Sprints
 
@@ -89,8 +97,8 @@ Authorized project readers can view sprint list, detail and tasks, including on 
 | `GET /sprints/:sprintId` | — | `200` Sprint with progress | `404 NOT_FOUND` |
 | `POST /sprints/:sprintId/start` | Empty body or `{}` | `200` Active sprint | `403 FORBIDDEN`, `404 NOT_FOUND`, `409 INVALID_STATE` or `ACTIVE_SPRINT_EXISTS` |
 | `POST /sprints/:sprintId/complete` | `{ rolloverSprintId }` with a sprint ID or `null` | `200` Completed sprint with saved progress | `400 VALIDATION_ERROR`, `403 FORBIDDEN`, `404 NOT_FOUND`, `409 INVALID_STATE` |
-| `POST /sprints/:sprintId/tasks/:taskId` | Empty body or `{}` | `200` Task with current sprint membership | `400 VALIDATION_ERROR`, `403 FORBIDDEN`, `404 NOT_FOUND`, `409 INVALID_STATE` |
-| `DELETE /sprints/:sprintId/tasks/:taskId` | Empty body or `{}` | `204` Membership cleared | `400 VALIDATION_ERROR`, `403 FORBIDDEN`, `404 NOT_FOUND`, `409 INVALID_STATE` |
+| `POST /sprints/:sprintId/tasks/:taskId` | Empty body or `{}`. Optional `expectedVersion` query parameter | `200` Task with current sprint membership | `400 VALIDATION_ERROR`, `403 FORBIDDEN`, `404 NOT_FOUND`, `409 INVALID_STATE`, `409 STALE_VERSION` |
+| `DELETE /sprints/:sprintId/tasks/:taskId` | Empty body or `{}`. Optional `expectedVersion` query parameter | `204` Membership cleared | `400 VALIDATION_ERROR`, `403 FORBIDDEN`, `404 NOT_FOUND`, `409 INVALID_STATE`, `409 STALE_VERSION` |
 
 Sprint fields are `id`, `projectId`, `name`, `startDate`, `endDate`, `status`, `createdAt`, `updatedAt`, `startedAt`, `completedAt`, `completionSnapshot` and `progress`. A sprint name is 3–150 characters after trimming. Dates are required and the end must be on or after the start. Only explicit lifecycle actions change `PLANNED` to `ACTIVE` and `ACTIVE` to `COMPLETED`. The lifecycle timestamps are nullable until their transition. The snapshot is null until completion, then contains `totalTasks` and `completedTasks`. Progress also contains `unfinishedTasks` and `completionPercentage`, rounded to two decimal places and zero when empty.
 

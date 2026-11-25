@@ -23,7 +23,7 @@ export function taskController(service: TaskService) {
 
   const changeStatus: TaskRequest<TaskStatusInput> = async (_request, response) => {
     const { user, input } = response.locals
-    response.json({ data: await service.changeStatus(user.id, input.params.id, input.body.status) })
+    response.json({ data: await service.changeStatus(user.id, input.params.id, input.body.status, input.body.expectedVersion) })
   }
 
   const update: TaskRequest<TaskUpdateInput> = async (_request, response) => {

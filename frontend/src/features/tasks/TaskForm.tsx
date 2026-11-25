@@ -5,18 +5,20 @@ import type { ProjectMember } from '../projects/api'
 import type { Task, TaskFields, TaskPriority, TaskStatus } from './api'
 import { taskPriorityLabels, taskStatusLabels } from './task-labels'
 
-export function TaskForm({ task, canManage, members, pending, error, onSave }: {
+export function TaskForm({ task, canManage, members, pending, error, onSave, submitLabel, submitBlocked }: {
   task?: Task
   canManage: boolean
   members?: ProjectMember[]
   pending: boolean
   error?: unknown
+  submitLabel?: string
+  submitBlocked?: boolean
   onSave: (fields: TaskFields) => void
 }) {
   const fields = useFieldErrors(error)
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (pending) return
+    if (pending || submitBlocked) return
     const data = new FormData(event.currentTarget)
     const fields: TaskFields = {
       title: String(data.get('title') ?? '').trim(),
@@ -84,7 +86,7 @@ export function TaskForm({ task, canManage, members, pending, error, onSave }: {
             )}
           </>
         )}
-        <button className={submitClass}>{pending ? 'Saving…' : task ? 'Save changes' : 'Create task'}</button>
+        <button className={submitClass} disabled={submitBlocked}>{pending ? 'Saving…' : submitLabel ?? (task ? 'Save changes' : 'Create task')}</button>
       </fieldset>
     </form>
   )

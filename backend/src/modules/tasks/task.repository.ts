@@ -5,7 +5,7 @@ import { dateAtUtcMidnight } from '../../shared/date-only.js'
 import { objectId } from '../../shared/object-id.js'
 import type { projectModel } from '../projects/project.model.js'
 import type { TaskRecord, TaskStatus, taskModel } from './task.model.js'
-import type { TaskCreateInput, TaskListInput, TaskUpdateInput } from './task.schemas.js'
+import type { TaskCreateInput, TaskListInput, TaskUpdateFields } from './task.schemas.js'
 
 export function taskListPipeline(projectId: string, { page, limit, status, priority, assigneeId, search, sprintId, unfinished }: TaskListInput['query']): PipelineStage[] {
   const exactId = search && objectId.safeParse(search).success ? new Types.ObjectId(search) : undefined
@@ -31,6 +31,12 @@ export function taskListPipeline(projectId: string, { page, limit, status, prior
   ]
 }
 
+function versionFilter(expectedVersion?: number): QueryFilter<TaskRecord> {
+  if (expectedVersion === undefined) return {}
+  if (expectedVersion === 0) return { $or: [{ version: 0 }, { version: { $exists: false } }] }
+  return { version: expectedVersion }
+}
+
 export function taskRepository(
   tasks: ReturnType<typeof taskModel>, projects: ReturnType<typeof projectModel>, activity: Pick<ActivityRepository, 'append'>,
 ) {
@@ -41,9 +47,10 @@ export function taskRepository(
     const affected = await tasks.find(filter).select('_id').session(session).lean().exec()
     if (!affected.length) return
     const createdAt = new Date()
-    await tasks.updateMany(filter, { $set: {
-      [change.field]: change.to, updatedBy: actorId, updatedAt: createdAt,
-    } }, { session, timestamps: false }).exec()
+    await tasks.updateMany(filter, {
+      $set: { [change.field]: change.to, updatedBy: actorId, updatedAt: createdAt },
+      $inc: { version: 1 },
+    }, { session, timestamps: false }).exec()
     await activity.append(affected.map(({ _id }) => ({
       taskId: _id, actorId, action: 'TASK_UPDATED', changes: [change], completed: false, createdAt,
     })), session)
@@ -79,9 +86,13 @@ export function taskRepository(
       return new Map(counts.map(({ _id, totalTasks, completedTasks }) => [_id.toString(), { totalTasks, completedTasks }]))
     },
 
-    changeSprint(id: string, from: string | null, to: string | null, actorId: string, session: ClientSession) {
-      return tasks.findOneAndUpdate({ _id: id, sprintId: from }, { $set: { sprintId: to, updatedBy: actorId } },
-        { session, returnDocument: 'after', runValidators: true }).lean().exec()
+    changeSprint(
+      id: string, from: string | null, to: string | null, actorId: string, session: ClientSession, expectedVersion?: number,
+    ) {
+      return tasks.findOneAndUpdate({ _id: id, sprintId: from, ...versionFilter(expectedVersion) }, {
+        $set: { sprintId: to, updatedBy: actorId },
+        $inc: { version: 1 },
+      }, { session, returnDocument: 'after', runValidators: true }).lean().exec()
     },
 
     rollOverSprint(projectId: Types.ObjectId, from: string, to: string | null, actorId: string, session: ClientSession) {
@@ -90,17 +101,22 @@ export function taskRepository(
       )
     },
 
-    update(id: string, userId: string, { dueDate, ...fields }: TaskUpdateInput['body'], session: ClientSession) {
-      return tasks.findByIdAndUpdate(id, { $set: {
-        ...fields,
-        ...(dueDate !== undefined && { dueDate: dateAtUtcMidnight(dueDate) }),
-        updatedBy: userId,
-      } }, { session, returnDocument: 'after', runValidators: true }).lean().exec()
+    update(id: string, userId: string, { dueDate, ...fields }: TaskUpdateFields, session: ClientSession, expectedVersion?: number) {
+      return tasks.findOneAndUpdate({ _id: id, ...versionFilter(expectedVersion) }, {
+        $set: {
+          ...fields,
+          ...(dueDate !== undefined && { dueDate: dateAtUtcMidnight(dueDate) }),
+          updatedBy: userId,
+        },
+        $inc: { version: 1 },
+      }, { session, returnDocument: 'after', runValidators: true }).lean().exec()
     },
 
-    updateStatus(id: string, userId: string, status: TaskStatus, session: ClientSession) {
-      return tasks.findByIdAndUpdate(id, { $set: { status, updatedBy: userId } },
-        { session, returnDocument: 'after', runValidators: true }).lean().exec()
+    updateStatus(id: string, userId: string, status: TaskStatus, session: ClientSession, expectedVersion?: number) {
+      return tasks.findOneAndUpdate({ _id: id, ...versionFilter(expectedVersion) }, {
+        $set: { status, updatedBy: userId },
+        $inc: { version: 1 },
+      }, { session, returnDocument: 'after', runValidators: true }).lean().exec()
     },
 
     remove(id: string, session: ClientSession) {

@@ -15,6 +15,7 @@ export interface TaskFields {
 export interface Task extends Required<TaskFields> {
   id: string
   projectId: string
+  version: number
   sprintId: string | null
   createdBy: string
   updatedBy: string | null
@@ -63,13 +64,13 @@ export async function getTask(taskId: string, signal?: AbortSignal): Promise<Tas
   return (await response.json()).data
 }
 
-export async function updateTask(taskId: string, fields: TaskChanges): Promise<Task> {
-  const response = await submitApi(`tasks/${encodeURIComponent(taskId)}`, 'PATCH', fields)
+export async function updateTask(taskId: string, fields: TaskChanges, expectedVersion: number): Promise<Task> {
+  const response = await submitApi(`tasks/${encodeURIComponent(taskId)}`, 'PATCH', { ...fields, expectedVersion })
   return (await response.json()).data
 }
 
-export async function updateTaskStatus(taskId: string, status: TaskStatus): Promise<Task> {
-  const response = await submitApi(`tasks/${encodeURIComponent(taskId)}/status`, 'PATCH', { status })
+export async function updateTaskStatus(taskId: string, status: TaskStatus, expectedVersion: number): Promise<Task> {
+  const response = await submitApi(`tasks/${encodeURIComponent(taskId)}/status`, 'PATCH', { status, expectedVersion })
   return (await response.json()).data
 }
 

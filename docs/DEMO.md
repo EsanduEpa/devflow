@@ -83,3 +83,15 @@ The Developer can read the graph. In their session the management controls are h
 ```sh
 npm --prefix backend run test:e2e -- dependencies.e2e.ts
 ```
+
+## M21 conflict walkthrough
+
+1. Open the same task as the workspace Owner and the assigned Manager in separate browser sessions. In the Manager session, choose **Edit task** and type a new description.
+2. In the Owner session, raise the priority to **High** and save.
+3. In the Manager session, click **Save changes**. The **Task changed** panel shows the latest saved values, and the draft description stays in the form.
+4. Click **Retry my changes**. The description saves and the priority stays High. Repeat the conflict and choose **Replace draft with latest values** to load the saved fields into the form instead.
+5. To check status or sprint membership recovery, have another session update the task after it loads and before your write. The conflict panel shows the latest task and offers a retry when the original action is still available.
+
+```sh
+npm --prefix backend run test:e2e -- task-conflicts.e2e.ts
+```

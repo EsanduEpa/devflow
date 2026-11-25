@@ -44,6 +44,6 @@ export async function changeSprintState(id: string, action: 'start' | 'complete'
   await submitApi(`sprints/${id}/${action}`, 'POST', body)
 }
 
-export async function changeSprintTask(id: string, taskId: string, add: boolean) {
-  await submitApi(`sprints/${id}/tasks/${taskId}`, add ? 'POST' : 'DELETE')
+export async function changeSprintTask(id: string, taskId: string, add: boolean, expectedVersion: number) {
+  await submitApi(`sprints/${id}/tasks/${taskId}?expectedVersion=${expectedVersion}`, add ? 'POST' : 'DELETE')
 }
