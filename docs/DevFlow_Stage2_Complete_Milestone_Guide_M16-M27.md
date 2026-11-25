@@ -163,16 +163,18 @@ The current `test:db` script lists its test files explicitly. Add each new datab
 
 **Outcome** Project members can discuss a task, mention eligible project members, and edit or delete their own comments.
 
+**Evidence** [M18 verification and mention occurrence rules](engineering-notes/012-m18-comment-verification.md) · [Comment API](API_REFERENCE.md#task-comments) · [Demo](DEMO.md#m18-comments-walkthrough)
+
 **Prerequisites** M16 and the existing task details and project membership checks.
 
 **Study and understand** Resource ownership, safe rendering of user text, and stable pagination.
 
 **Steps to complete**
 
-1. [ ] Define a task-scoped comment, author, body limits, timestamps, and mention references. Validate mention targets against the task's project on the server.
-2. [ ] Add comment list, create, edit, and delete operations. Check project access before reading and author ownership before editing or deleting.
-3. [ ] Add comment history, composer, and mention selection to the task detail view. Render the comment as text and handle pending, error, and empty states.
-4. [ ] Document how a committed mention is identified for M24, including how edited comments affect mentions that were already recorded.
+1. [x] Define a task-scoped comment, author, body limits, timestamps, and mention references. Validate mention targets against the task's project on the server.
+2. [x] Add comment list, create, edit, and delete operations. Check project access before reading and author ownership before editing or deleting.
+3. [x] Add comment history, composer, and mention selection to the task detail view. Render the comment as text and handle pending, error, and empty states.
+4. [x] Document how a committed mention is identified for M24, including how edited comments affect mentions that were already recorded.
 
 **Verify and test** Use two project members and one outsider. Test creating and editing a comment, rejection of changes by another author, an ineligible mention, and predictable list order across pages.
 

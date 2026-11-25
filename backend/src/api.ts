@@ -3,6 +3,10 @@ import type { Connection } from 'mongoose'
 import type { AuthConfig } from './config/auth.js'
 import type { ResetEmailConfig } from './config/reset-email.js'
 import { createAuthModule, type AuthCollections } from './modules/auth/auth.routes.js'
+import { commentModel } from './modules/comments/comment.model.js'
+import { commentRepository } from './modules/comments/comment.repository.js'
+import { createCommentRoutes } from './modules/comments/comment.routes.js'
+import { commentService } from './modules/comments/comment.service.js'
 import { dashboardRepository } from './modules/dashboard/dashboard.repository.js'
 import { createDashboardRoutes } from './modules/dashboard/dashboard.routes.js'
 import { dashboardService } from './modules/dashboard/dashboard.service.js'
@@ -23,7 +27,14 @@ export async function createApi(
   connection: Connection,
   authConfig: AuthConfig,
   emailConfig: ResetEmailConfig,
-  collections?: { auth: AuthCollections; workspace: WorkspaceCollections; project: ProjectCollections; task: { tasks: string }; sprint: { sprints: string } },
+  collections?: {
+    auth: AuthCollections
+    workspace: WorkspaceCollections
+    project: ProjectCollections
+    task: { tasks: string }
+    sprint: { sprints: string }
+    comment: { comments: string }
+  },
 ) {
   const auth = await createAuthModule(connection, authConfig, emailConfig, collections?.auth)
   const projectModels = {
@@ -32,12 +43,16 @@ export async function createApi(
   }
   const tasks = taskModel(connection, collections?.task.tasks)
   const sprints = sprintModel(connection, collections?.sprint.sprints)
-  await Promise.all([tasks.createIndexes(), sprints.createIndexes()])
+  const comments = commentModel(connection, collections?.comment.comments)
+  await Promise.all([tasks.createIndexes(), sprints.createIndexes(), comments.createIndexes()])
+  const commentStore = commentRepository(comments, auth.users)
   const sprintStore = sprintRepository(sprints)
   const taskStore = taskRepository(tasks, projectModels.projects)
   const workspaces = await createWorkspaceRoutes(connection, auth, projectModels, taskStore, collections?.workspace)
   const projects = await createProjectRoutes(projectModels, auth, workspaces, taskStore)
-  const taskRoutes = createTaskRoutes(taskService(taskStore, projects.service, workspaces.service, sprintStore), auth)
+  const taskOperations = taskService(taskStore, projects.service, workspaces.service, sprintStore, commentStore)
+  const taskRoutes = createTaskRoutes(taskOperations, auth)
+  const commentRoutes = createCommentRoutes(commentService(commentStore, taskOperations, projects.service, workspaces.service), auth)
   const dashboardRoutes = createDashboardRoutes(dashboardService(dashboardRepository(tasks), projects.service), auth.requireUser)
   const router = Router()
 
@@ -49,6 +64,7 @@ export async function createApi(
   router.use('/projects', taskRoutes.projectTasks)
   router.use('/projects', dashboardRoutes)
   router.use('/tasks', taskRoutes.tasks)
+  router.use('/tasks', commentRoutes)
   router.use('/invitations', workspaces.invitationRouter)
   return router
 }

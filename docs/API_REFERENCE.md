@@ -1,6 +1,6 @@
 # DevFlow API reference
 
-The Stage 1 and sprint endpoints below use `/api/v1`. The local browser calls them through the Vite proxy on `http://127.0.0.1:5173`. Express also listens on `http://127.0.0.1:3000`. `GET /api/health` returns `200` and `{ "status": "ok" }` as a separate startup check.
+The endpoints below use `/api/v1`. The local browser calls them through the Vite proxy on `http://127.0.0.1:5173`. Express also listens on `http://127.0.0.1:3000`. `GET /api/health` returns `200` and `{ "status": "ok" }` as a separate startup check.
 
 ## Requests, sessions, and errors
 
@@ -95,3 +95,17 @@ Authorized project readers can view sprint list, detail and tasks, including on 
 Sprint fields are `id`, `projectId`, `name`, `startDate`, `endDate`, `status`, `createdAt`, `updatedAt`, `startedAt`, `completedAt`, `completionSnapshot` and `progress`. A sprint name is 3–150 characters after trimming. Dates are required and the end must be on or after the start. Only explicit lifecycle actions change `PLANNED` to `ACTIVE` and `ACTIVE` to `COMPLETED`. The lifecycle timestamps are nullable until their transition. The snapshot is null until completion, then contains `totalTasks` and `completedTasks`. Progress also contains `unfinishedTasks` and `completionPercentage`, rounded to two decimal places and zero when empty.
 
 Membership changes preserve task status. An add can be repeated against the same planned or active sprint, and a task assigned to a different sprint must first be removed from it. Completed membership is closed to direct membership edits. At completion, unfinished tasks move to the backlog by clearing `sprintId` or into the selected same-project planned sprint starting after the current sprint ends. Done tasks remain linked. Later changes to a task do not change a completed sprint’s snapshot.
+
+## Task comments
+
+Authorized project readers can view comments. Project readers can post to editable projects. Only the author may edit or delete their comment. Archived projects retain the discussion for reading.
+
+| Endpoint | Input | Success | Specific errors |
+| --- | --- | --- | --- |
+| `GET /tasks/:taskId/comments` | Optional `page`, `limit` | `200` Paginated comments, ordered newest first by creation time and ID | `404 NOT_FOUND` |
+| `GET /tasks/:taskId/comments/mention-options` | — | `200` Array of `{ id, name }` for users with current project access | `404 NOT_FOUND` |
+| `POST /tasks/:taskId/comments` | `body`, optional `mentionUserIds` | `201` Created comment | `400 VALIDATION_ERROR`, `404 NOT_FOUND`, `409 INVALID_STATE` |
+| `PATCH /tasks/:taskId/comments/:commentId` | At least one of `body` or `mentionUserIds` | `200` Updated comment | `400 VALIDATION_ERROR`, `403 FORBIDDEN`, `404 NOT_FOUND`, `409 INVALID_STATE` |
+| `DELETE /tasks/:taskId/comments/:commentId` | — | `204` Comment deleted | `403 FORBIDDEN`, `404 NOT_FOUND`, `409 INVALID_STATE` |
+
+Comment fields are `id`, `taskId`, `author: { id, name }`, `body`, `mentionUserIds`, `mentions: [{ id, name }]`, `revision`, `createdAt`, and `updatedAt`. A missing person’s display name is `null`. The body is plain text and accepts 1–5,000 characters after trimming. Mention IDs are a distinct list of up to 20 eligible users. On edit, the server validates the resulting list. Remove any mention that has lost project access before saving. Use an empty list to clear mentions. Deleting a task permanently removes its comments.

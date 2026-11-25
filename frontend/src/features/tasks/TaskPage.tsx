@@ -6,6 +6,7 @@ import { ApiError, apiErrorMessage } from '../../shared/api'
 import { formatDateOnly } from '../../shared/date-only'
 import { errorClass, successClass } from '../../shared/form-styles'
 import { Badge, ConfirmDialog, LoadingState, Modal, PageHeader } from '../../shared/ui'
+import { TaskComments } from '../comments/TaskComments'
 import { getProject, listProjectMembers, projectKeys, type Project } from '../projects/api'
 import { listWorkspaceMembers, workspaceKeys } from '../workspaces/api'
 import { formatDate } from '../workspaces/workspace-labels'
@@ -136,6 +137,7 @@ function TaskPanel({ project, userId, task, drawer }: { project: Project; userId
           {!task && !drawer && <Link className="ui-button ui-ghost mt-2" to={`${projectUrl}/board`}>Cancel</Link>}
         </section>
       )}
+      {task && !editing && <TaskComments taskId={task.id} projectId={project.id} userId={userId} editable={editable} />}
       {task && !editing && save.isSuccess && <p className={successClass} role="status">Changes saved.</p>}
     </div>
   )

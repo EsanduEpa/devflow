@@ -14,6 +14,7 @@ const collections = {
   project: { projects: `m10_projects_${suffix}`, members: `m10_project_members_${suffix}` },
   task: { tasks: `m10_tasks_${suffix}` },
   sprint: { sprints: `m10_sprints_${suffix}` },
+  comment: { comments: `m10_comments_${suffix}` },
 }
 const origin = 'http://127.0.0.1:5173'
 const api = '/api/v1'

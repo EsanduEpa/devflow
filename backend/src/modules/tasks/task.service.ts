@@ -1,5 +1,6 @@
 import type { ClientSession } from 'mongoose'
 import { ApiError } from '../../shared/api-error.js'
+import type { CommentRepository } from '../comments/comment.repository.js'
 import type { ProjectRecord } from '../projects/project.model.js'
 import type { ProjectService } from '../projects/project.service.js'
 import type { WorkspaceService } from '../workspaces/workspace.service.js'
@@ -12,7 +13,10 @@ function taskNotFound() {
   return new ApiError(404, 'NOT_FOUND', 'The task was not found.')
 }
 
-export function taskService(repository: TaskRepository, projects: ProjectService, workspaces: WorkspaceService, sprints: Pick<SprintRepository, 'find'>) {
+export function taskService(
+  repository: TaskRepository, projects: ProjectService, workspaces: WorkspaceService,
+  sprints: Pick<SprintRepository, 'find'>, comments: Pick<CommentRepository, 'removeForTask'>,
+) {
   async function requireTaskAccess(userId: string, taskId: string, session?: ClientSession) {
     const task = await repository.find(taskId, session)
     if (!task) throw taskNotFound()
@@ -47,6 +51,8 @@ export function taskService(repository: TaskRepository, projects: ProjectService
   }
 
   return {
+    requireAccess: requireTaskAccess,
+
     create(userId: string, projectId: string, fields: TaskCreateInput['body']) {
       return repository.transaction(async (session) => {
         const { project, canManage } = await projects.requireAccess(userId, projectId, session)
@@ -108,6 +114,7 @@ export function taskService(repository: TaskRepository, projects: ProjectService
       return manage(userId, taskId, async (_project, session) => {
         const result = await repository.remove(taskId, session)
         if (!result.deletedCount) throw taskNotFound()
+        await comments.removeForTask(taskId, session)
       })
     },
   }

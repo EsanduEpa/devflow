@@ -14,6 +14,7 @@ const collections = {
   project: { projects: `m7_projects_${suffix}`, members: `m7_project_members_${suffix}` },
   task: { tasks: `m7_tasks_${suffix}` },
   sprint: { sprints: `m7_sprints_${suffix}` },
+  comment: { comments: `m7_comments_${suffix}` },
 }
 const origin = 'http://127.0.0.1:5173'
 const authUrl = '/api/v1/auth'

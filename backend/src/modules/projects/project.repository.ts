@@ -99,6 +99,31 @@ export function projectRepository(
       return projectMembers.deleteOne({ projectId, userId }, { session }).exec()
     },
 
+    listAccessUsers(project: ProjectRecord, ids?: string[], session?: ClientSession) {
+      return workspaceMembers.aggregate<{ id: string; name: string }>([
+        { $match: {
+          workspaceId: project.workspaceId,
+          ...(ids && { userId: { $in: ids.map((id) => new Types.ObjectId(id)) } }),
+        } },
+        { $lookup: {
+          from: projectMembers.collection.name, localField: 'userId', foreignField: 'userId',
+          pipeline: [{ $match: { projectId: project._id } }, { $project: { _id: 1 } }], as: 'roster',
+        } },
+        { $match: { $or: [
+          { role: 'OWNER' },
+          { role: 'MANAGER', userId: project.managerId },
+          { 'roster.0': { $exists: true } },
+        ] } },
+        { $lookup: {
+          from: users.collection.name, localField: 'userId', foreignField: '_id',
+          pipeline: [{ $project: { name: 1 } }], as: 'user',
+        } },
+        { $unwind: '$user' },
+        { $sort: { 'user.name': 1, userId: 1 } },
+        { $project: { _id: 0, id: { $toString: '$userId' }, name: '$user.name' } },
+      ]).session(session ?? null).exec()
+    },
+
     listMembers(project: ProjectRecord) {
       return projectMembers.aggregate<ProjectMemberSummary>([
         { $match: { projectId: project._id } },
