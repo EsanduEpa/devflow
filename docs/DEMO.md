@@ -28,3 +28,18 @@ npm --prefix backend run test:e2e -- --headed --grep "invited Developer workflow
 - **Testing and tradeoffs.** Give one example each from unit, integration, and Playwright tests. Discuss the cost of exact counts on large projects and the contention tradeoff of a shared workspace revision. Tie future sprint and real-time work to Stage 2 collaboration needs.
 
 Practice explaining the examples in your own words. [Architecture diagram](SYSTEM_DESIGN.md#1-system-architecture) · [Engineering decisions](engineering-notes/007-mvp-decisions.md) · [Verification record](engineering-notes/008-mvp-verification.md)
+
+## M17 sprint walkthrough
+
+Use separate sessions for the assigned Manager and a Developer on the project roster. Prepare a Done task and a task in progress.
+
+1. As Manager, open **Sprints**. Plan the current sprint and a future sprint that starts after it ends.
+2. Open the current sprint, add both tasks, and start it. As Developer, open the same sprint and check the progress is one of two tasks done.
+3. As Manager, choose **Complete sprint**. Review the unfinished work, select the future sprint, and confirm.
+4. As Developer, refresh the current sprint to see its saved 50% progress. Open the future sprint to see the unfinished task with its original In Progress status.
+
+The [browser workflow](../backend/e2e/sprints.e2e.ts) rehearses these steps with isolated test data.
+
+```sh
+npm --prefix backend run test:e2e -- sprints.e2e.ts
+```

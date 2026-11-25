@@ -9,6 +9,10 @@ import { dashboardService } from './modules/dashboard/dashboard.service.js'
 import { projectMemberModel } from './modules/projects/project-member.model.js'
 import { projectModel } from './modules/projects/project.model.js'
 import { createProjectRoutes, type ProjectCollections } from './modules/projects/project.routes.js'
+import { sprintModel } from './modules/sprints/sprint.model.js'
+import { sprintRepository } from './modules/sprints/sprint.repository.js'
+import { createSprintRoutes } from './modules/sprints/sprint.routes.js'
+import { sprintService } from './modules/sprints/sprint.service.js'
 import { taskModel } from './modules/tasks/task.model.js'
 import { taskRepository } from './modules/tasks/task.repository.js'
 import { createTaskRoutes } from './modules/tasks/task.routes.js'
@@ -19,7 +23,7 @@ export async function createApi(
   connection: Connection,
   authConfig: AuthConfig,
   emailConfig: ResetEmailConfig,
-  collections?: { auth: AuthCollections; workspace: WorkspaceCollections; project: ProjectCollections; task: { tasks: string } },
+  collections?: { auth: AuthCollections; workspace: WorkspaceCollections; project: ProjectCollections; task: { tasks: string }; sprint: { sprints: string } },
 ) {
   const auth = await createAuthModule(connection, authConfig, emailConfig, collections?.auth)
   const projectModels = {
@@ -27,15 +31,18 @@ export async function createApi(
     members: projectMemberModel(connection, collections?.project.members),
   }
   const tasks = taskModel(connection, collections?.task.tasks)
-  await tasks.createIndexes()
+  const sprints = sprintModel(connection, collections?.sprint.sprints)
+  await Promise.all([tasks.createIndexes(), sprints.createIndexes()])
+  const sprintStore = sprintRepository(sprints)
   const taskStore = taskRepository(tasks, projectModels.projects)
   const workspaces = await createWorkspaceRoutes(connection, auth, projectModels, taskStore, collections?.workspace)
   const projects = await createProjectRoutes(projectModels, auth, workspaces, taskStore)
-  const taskRoutes = createTaskRoutes(taskService(taskStore, projects.service, workspaces.service), auth)
+  const taskRoutes = createTaskRoutes(taskService(taskStore, projects.service, workspaces.service, sprintStore), auth)
   const dashboardRoutes = createDashboardRoutes(dashboardService(dashboardRepository(tasks), projects.service), auth.requireUser)
   const router = Router()
 
   router.use(auth.router)
+  router.use(createSprintRoutes(sprintService(sprintStore, taskStore, projects.service, workspaces.service), auth))
   router.use('/workspaces', workspaces.router)
   router.use('/workspaces', projects.workspaceProjects)
   router.use('/projects', projects.projectDetails)

@@ -1512,13 +1512,18 @@ Test calculations using prepared task data.
 
 # 24. Stage 2 and Stage 3 Compatibility
 
-The database design should allow later additions without implementing them now.
+## Implemented in M17
 
-Possible future collections include:
+The `sprints` collection stores a required project ID, name, UTC date-only start and end dates, lifecycle status, timestamps and a nullable completion snapshot. Tasks store at most one nullable `sprintId`. Queries treat missing sprint IDs on legacy records as null. Lifecycle writes use conditional state predicates.
+
+The `one_active_sprint_per_project` partial unique index covers `projectId` on active sprints. The sprint list uses `{ projectId: 1, startDate: -1, _id: -1 }`. Task membership, progress counts and sprint task lists use the project and sprint prefix of `{ projectId: 1, sprintId: 1, createdAt: -1, _id: -1 }`.
+
+Sprint mutations share the existing workspace write lock with archive, membership and task mutations. Completion calculates the snapshot, moves unfinished tasks and transitions the sprint in one transaction. The saved counts stay fixed if a previously Done task is reopened or deleted.
+
+## Future collections
 
 **Stage 2**
 
-- Sprints.
 - Comments.
 - Activity history.
 - Notifications.
@@ -1529,8 +1534,6 @@ Possible future collections include:
 - GitHub integrations.
 - Webhook event records.
 - Additional background job information where needed.
-
-These collections are not part of the Stage 1 implementation.
 
 Existing references such as User IDs, Project IDs, and Task IDs will allow future collections to connect to current records.
 

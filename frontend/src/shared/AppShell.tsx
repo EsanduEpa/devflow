@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, matchPath, useLocation, useNavigate, type Location } from 'react-router'
-import { PanelsTopLeft, Building2, ChevronDown, ChevronRight, FolderKanban, Folders, LayoutDashboard, ListTodo,
+import { PanelsTopLeft, Building2, CalendarRange, ChevronDown, ChevronRight, FolderKanban, Folders, LayoutDashboard, ListTodo,
   LogOut, Menu, Settings, UserRound, UsersRound, X, type LucideIcon } from 'lucide-react'
 import { authErrorMessage, logout, type PublicUser } from '../features/auth/api'
 import { getProject, projectKeys } from '../features/projects/api'
@@ -155,6 +155,7 @@ export function AppShell({ user, theme, onToggle, current, children }: {
           <p className="truncate px-3 py-1 text-xs font-semibold text-secondary" title={project.name}>{project.name}</p>
           {link(projectPath, 'Dashboard', LayoutDashboard, path === projectPath || path === `${projectPath}/dashboard`)}
           {link(`${projectPath}/board`, 'Board', FolderKanban)}
+          {link(`${projectPath}/sprints`, 'Sprints', CalendarRange, path.startsWith(`${projectPath}/sprints`))}
           {link(`${projectPath}/tasks`, 'Task list', ListTodo, path === `${projectPath}/tasks` || Boolean(taskId) || path === `${projectPath}/tasks/new`)}
           {canManage && link(`${projectPath}/settings`, 'Project settings', Settings)}
         </div>}

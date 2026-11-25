@@ -13,6 +13,7 @@ const collections = {
   workspace: { workspaces: `m10_workspaces_${suffix}`, members: `m10_workspace_members_${suffix}`, invitations: `m10_invites_${suffix}` },
   project: { projects: `m10_projects_${suffix}`, members: `m10_project_members_${suffix}` },
   task: { tasks: `m10_tasks_${suffix}` },
+  sprint: { sprints: `m10_sprints_${suffix}` },
 }
 const origin = 'http://127.0.0.1:5173'
 const api = '/api/v1'
