@@ -152,3 +152,17 @@ Socket.IO uses WebSocket transport at `/socket.io` on the same server as REST. T
 | `project:access-revoked` | Server → client | `{ projectId }` sent privately to an affected session when its subscription is removed. |
 
 Project signals are published after the corresponding REST commit. Active sessions and project access are revalidated before delivery. Session revocation disconnects the socket. Clients resubscribe and refetch authorized data after reconnecting. Delivery is a hint to refresh the affected views. [Socket.IO delivery guarantees](https://socket.io/docs/v4/delivery-guarantees/)
+
+## Notifications
+
+The signed-in session identifies the recipient. Notifications sort newest first by creation time and ID. Opening a linked task uses the existing task access checks.
+
+| Endpoint | Input | Success | Specific errors |
+| --- | --- | --- | --- |
+| `GET /notifications` | Optional `page`, `limit` | `200` Paginated notifications | `400 VALIDATION_ERROR` |
+| `GET /notifications/unread-count` | — | `200` with `{ count }` in `data` | Shared errors |
+| `PATCH /notifications/:id` | `{ read: true }` with the usual write CSRF checks | `200` Updated notification. Repeats preserve the first read timestamp | `400 VALIDATION_ERROR`, `404 NOT_FOUND` for missing IDs or another recipient’s item |
+
+Notification fields are `id`, `kind`, `createdAt`, nullable `readAt`, and `unavailable`. Accessible task notifications include `task: { id, title }`. An available invitation for the recipient’s current email includes `workspaceName` and uses the Owner’s manually shared acceptance link. Items that have become unavailable retain read state and omit related task and workspace details.
+
+Kinds are `ASSIGNMENT`, `MENTION`, `REVIEW`, `REOPENED`, `DEADLINE`, and `INVITATION`. `REOPENED` goes to the current assignee when another user moves their task out of `DONE`. The server sends a payload-free `notifications:changed` socket event to the authenticated recipient’s sessions after an insertion or read-state change. The client refetches the inbox and unread count from REST. Project membership removal also signals the affected account so open inboxes can refresh link visibility.

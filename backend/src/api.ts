@@ -17,6 +17,12 @@ import { dependencyModel } from './modules/dependencies/dependency.model.js'
 import { dependencyRepository } from './modules/dependencies/dependency.repository.js'
 import { createDependencyRoutes } from './modules/dependencies/dependency.routes.js'
 import { dependencyService } from './modules/dependencies/dependency.service.js'
+import { createDeadlineScan, type DeadlineScan } from './modules/notifications/deadline-scan.js'
+import { notificationModel } from './modules/notifications/notification.model.js'
+import { notificationRepository } from './modules/notifications/notification.repository.js'
+import { createNotificationRoutes } from './modules/notifications/notification.routes.js'
+import { notificationService } from './modules/notifications/notification.service.js'
+import { notificationTriggers } from './modules/notifications/notification-triggers.js'
 import { projectMemberModel } from './modules/projects/project-member.model.js'
 import { projectModel } from './modules/projects/project.model.js'
 import { createProjectRoutes, type ProjectCollections } from './modules/projects/project.routes.js'
@@ -44,8 +50,10 @@ export async function createApi(
     comment: { comments: string }
     activity: { activity: string }
     dependency: { dependencies: string }
+    notification: { notifications: string }
   },
   live?: Realtime,
+  bindDeadlineScan?: (scan: DeadlineScan) => void,
 ) {
   const auth = await createAuthModule(connection, authConfig, emailConfig, collections?.auth, live)
   const projectModels = {
@@ -57,24 +65,31 @@ export async function createApi(
   const comments = commentModel(connection, collections?.comment.comments)
   const activity = activityModel(connection, collections?.activity.activity)
   const dependencies = dependencyModel(connection, collections?.dependency.dependencies)
+  const notifications = notificationModel(connection, collections?.notification.notifications)
   await Promise.all([
     tasks.createIndexes(), sprints.createIndexes(), comments.createIndexes(), activity.createIndexes(), dependencies.createIndexes(),
+    notifications.createIndexes(),
   ])
+  const inbox = notificationRepository(notifications)
+  const triggers = notificationTriggers(inbox, live)
   const dependencyStore = dependencyRepository(dependencies, tasks)
   const activityStore = activityRepository(activity, auth.users, sprints)
   const commentStore = commentRepository(comments, auth.users)
   const sprintStore = sprintRepository(sprints)
   const taskStore = taskRepository(tasks, projectModels.projects, activityStore)
-  const workspaces = await createWorkspaceRoutes(connection, auth, projectModels, taskStore, collections?.workspace, live)
+  const workspaces = await createWorkspaceRoutes(connection, auth, projectModels, taskStore, triggers, collections?.workspace, live)
   const projects = await createProjectRoutes(projectModels, auth, workspaces, taskStore, live)
   live?.bind(auth.service, projects.service)
-  const taskOperations = taskService(taskStore, projects.service, workspaces.service, sprintStore, commentStore, activityStore, dependencyStore)
+  const taskOperations = taskService(taskStore, projects.service, workspaces.service, sprintStore, commentStore, triggers, activityStore, dependencyStore)
   const taskRoutes = createTaskRoutes(taskOperations, auth, live)
-  const commentRoutes = createCommentRoutes(commentService(commentStore, taskOperations, projects.service, workspaces.service, live), auth)
+  const commentRoutes = createCommentRoutes(commentService(commentStore, taskOperations, triggers, projects.service, workspaces.service, live), auth)
   const dashboardRoutes = createDashboardRoutes(dashboardService(dashboardRepository(tasks), projects.service), auth.requireUser)
+  const inboxService = notificationService(inbox, tasks, projects.service, workspaces.invitationModel, workspaces.workspaces, live)
+  bindDeadlineScan?.(createDeadlineScan(tasks, projectModels.projects, projects.service, workspaces.service, inbox, live))
   const router = Router()
 
   router.use(auth.router)
+  router.use('/notifications', createNotificationRoutes(inboxService, auth))
   router.use(createSprintRoutes(sprintService(sprintStore, taskStore, projects.service, workspaces.service, activityStore), auth, live))
   router.use('/workspaces', workspaces.router)
   router.use('/workspaces', projects.workspaceProjects)

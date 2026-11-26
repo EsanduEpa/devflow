@@ -1544,11 +1544,11 @@ Blocked state is derived from current direct prerequisites. At least one direct 
 
 Tasks store a `version` that starts at zero. Existing tasks with no stored version match version zero. Version-aware edits, moves and direct sprint membership writes use a single update predicate for the task ID and expected version, and increment the version in the same write. Older clients omit the predicate and still increment the version. Bulk sprint rollover and membership-driven unassignment increment each affected task version in the transaction that updates its fields and records activity.
 
+## Implemented in M24
+
+The `notifications` collection stores the recipient, kind, occurrence ID, task or invitation reference, creation time and nullable read time. A unique index on recipient, kind and occurrence ID deduplicates inserts. Separate indexes support the recipient’s newest-first inbox and unread count. Immediate notification writes share the source transaction. The deadline scan uses the task due-date index and rechecks eligibility inside the same workspace write boundary as task and membership changes.
+
 ## Future collections
-
-**Stage 2**
-
-- Notifications.
 
 **Stage 3**
 

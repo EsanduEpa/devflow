@@ -1,32 +1,15 @@
 import { useEffect, useEffectEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { io, type Socket } from 'socket.io-client'
-import type { PublicUser } from '../auth/api'
 import { commentKeys } from '../comments/api'
 import { projectKeys } from '../projects/api'
 import { workspaceKeys } from '../workspaces/api'
 import { projectQueries } from './project-cache'
 
-type ProjectEvent = {
-  eventId: string
-  projectId: string
-  kind: 'task.changed' | 'task.deleted' | 'comment.changed' | 'sprint.changed' | 'project.changed'
-  taskId?: string
-  version?: number
-}
-type Ack = { data: { projectId: string } } | { error: { code: string; message: string } }
-type ServerEvents = {
-  'project:changed': (event: ProjectEvent) => void
-  'project:access-revoked': (event: { projectId: string }) => void
-}
-type ClientEvents = {
-  'project:subscribe': (input: { projectId: string }, ack: (reply: Ack) => void) => void
-  'project:unsubscribe': (input: { projectId: string }) => void
-}
+import type { LiveSocket, ProjectEvent } from './useLiveSocket'
 
 export function useProjectLive({
-  userId, projectId, workspaceId, taskId, onRevoked,
-}: { userId: string; projectId?: string; workspaceId?: string; taskId?: string; onRevoked: (projectId: string) => void }) {
+  socket, userId, projectId, workspaceId, taskId, onRevoked,
+}: { socket: LiveSocket; userId: string; projectId?: string; workspaceId?: string; taskId?: string; onRevoked: (projectId: string) => void }) {
   const client = useQueryClient()
   const currentScope = useEffectEvent(() => ({ projectId, workspaceId, taskId }))
   const reportRevoked = useEffectEvent((id: string) => onRevoked(id))
@@ -34,7 +17,6 @@ export function useProjectLive({
   useEffect(() => {
     if (!projectId) return
     const subscribedProjectId = projectId
-    const socket: Socket<ServerEvents, ClientEvents> = io({ autoConnect: false, transports: ['websocket'] })
     const seen = new Set<string>()
     const changedTasks = new Set<string>()
     const changedComments = new Set<string>()
@@ -78,7 +60,6 @@ export function useProjectLive({
       void client.invalidateQueries({ queryKey: workspaceKeys.list(userId) })
       if (workspaceId) void client.invalidateQueries({ queryKey: projectKeys.lists(userId, workspaceId) })
       active = false
-      socket.disconnect()
     }
 
     function receive(event: ProjectEvent) {
@@ -95,11 +76,6 @@ export function useProjectLive({
       }
       if (event.kind === 'project.changed') membersChanged = true
       schedule()
-    }
-
-    async function checkSession() {
-      await client.invalidateQueries({ queryKey: ['current-user'] })
-      if (active && client.getQueryData<PublicUser | null>(['current-user'])?.id === userId) socket.connect()
     }
 
     let subscribeTimer: ReturnType<typeof setTimeout> | undefined
@@ -121,31 +97,26 @@ export function useProjectLive({
       })
     }
 
-    socket.on('project:changed', receive)
-    socket.on('project:access-revoked', revoke)
-    socket.on('connect', () => {
+    const connected = () => {
       seen.clear()
       clearTimeout(subscribeTimer)
       subscribe()
-    })
-    socket.on('disconnect', (reason) => {
-      clearTimeout(subscribeTimer)
-      if (active && reason === 'io server disconnect') void checkSession()
-    })
-    socket.on('connect_error', (error) => {
-      if (active && error.data?.code === 'UNAUTHENTICATED') void client.invalidateQueries({ queryKey: ['current-user'] })
-      else if (active && error.data?.code === 'UNAVAILABLE') subscribeTimer = setTimeout(() => socket.connect(), 2_000)
-    })
-
-    const start = setTimeout(() => { if (active) socket.connect() }, 0)
+    }
+    const disconnected = () => clearTimeout(subscribeTimer)
+    socket.on('project:changed', receive)
+    socket.on('project:access-revoked', revoke)
+    socket.on('connect', connected)
+    socket.on('disconnect', disconnected)
+    if (socket.connected) subscribe()
     return () => {
       active = false
-      clearTimeout(start)
       clearTimeout(subscribeTimer)
       clearTimeout(flushTimer)
       if (socket.connected) socket.emit('project:unsubscribe', { projectId })
-      socket.removeAllListeners()
-      socket.disconnect()
+      socket.off('project:changed', receive)
+      socket.off('project:access-revoked', revoke)
+      socket.off('connect', connected)
+      socket.off('disconnect', disconnected)
     }
-  }, [client, projectId, userId])
+  }, [client, projectId, socket, userId])
 }

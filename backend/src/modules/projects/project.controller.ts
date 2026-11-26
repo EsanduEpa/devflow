@@ -45,6 +45,7 @@ export function projectController(service: ProjectService, live?: Realtime) {
   const removeMember: ProjectRequest<ProjectMemberRemoveInput> = async (_request, response) => {
     const { user, input } = response.locals
     await service.removeMember(user.id, input.params.id, input.params.userId)
+    live?.notifyRecipients([input.params.userId])
     live?.publish({ projectId: input.params.id, kind: 'project.changed' })
     response.status(204).end()
   }

@@ -3,6 +3,7 @@ import { createApi } from './api.js'
 import { createApp } from './app.js'
 import { authConfig } from './config/auth.js'
 import { connectDatabase } from './config/database.js'
+import { startDeadlineScan, type DeadlineScan } from './modules/notifications/deadline-scan.js'
 import { createRealtime } from './modules/realtime/realtime.js'
 import { resetEmailConfig } from './config/reset-email.js'
 
@@ -30,7 +31,8 @@ const connection = await connectDatabase(uri, 'devflow_db')
 console.log('Connected to MongoDB (devflow_db).')
 
 const live = createRealtime(config.auth)
-const api = await createApi(connection, config.auth, config.resetEmail, undefined, live).catch(() => {
+let deadlineScan: DeadlineScan | undefined
+const api = await createApi(connection, config.auth, config.resetEmail, undefined, live, (scan) => { deadlineScan = scan }).catch(() => {
   console.error('Could not initialize the DevFlow API. Check database permissions and indexes.')
   process.exit(1)
 })
@@ -41,6 +43,7 @@ const port = Number(process.env.PORT ?? '3000')
 const server = createServer(app)
 live.attach(server)
 server.once('listening', () => {
+  if (deadlineScan) startDeadlineScan(deadlineScan)
   console.log(`DevFlow API listening on http://127.0.0.1:${port}`)
 })
 

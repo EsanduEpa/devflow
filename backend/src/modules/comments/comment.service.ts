@@ -1,6 +1,7 @@
 import type { ClientSession } from 'mongoose'
 import { ApiError } from '../../shared/api-error.js'
 import type { PageRequest } from '../../shared/pagination.js'
+import type { NotificationTriggers } from '../notifications/notification-triggers.js'
 import type { ProjectRecord } from '../projects/project.model.js'
 import type { ProjectService } from '../projects/project.service.js'
 import type { Realtime } from '../realtime/realtime.js'
@@ -19,7 +20,7 @@ function requireEditable(project: ProjectRecord) {
 
 export function commentService(
   repository: CommentRepository, tasks: Pick<TaskService, 'requireAccess'>,
-  projects: Pick<ProjectService, 'listAccessUsers'>, workspaces: Pick<WorkspaceService, 'lockMemberships'>, live?: Realtime,
+  notifications: NotificationTriggers, projects: Pick<ProjectService, 'listAccessUsers'>, workspaces: Pick<WorkspaceService, 'lockMemberships'>, live?: Realtime,
 ) {
   async function render(records: CommentRecord[], session?: ClientSession) {
     if (!records.length) return []
@@ -47,15 +48,15 @@ export function commentService(
   }
 
   async function write<T>(
-    userId: string, taskId: string, operation: (project: ProjectRecord, session: ClientSession) => Promise<T>,
+    userId: string, taskId: string, operation: (project: ProjectRecord, session: ClientSession) => Promise<{ result: T; recipients?: string[] }>,
   ) {
-    const { projectId, result } = await repository.transaction(async (session) => {
+    const { projectId, result, recipients = [] } = await repository.transaction(async (session) => {
       const { project } = await tasks.requireAccess(userId, taskId, session)
       await workspaces.lockMemberships(project.workspaceId.toString(), session)
-      return { projectId: project._id.toString(), result: await operation(project, session) }
+      return { projectId: project._id.toString(), ...await operation(project, session) }
     })
     live?.publish({ projectId, kind: 'comment.changed', taskId })
-    return result
+    return notifications.committed({ result, recipients })
   }
 
   async function requireAuthor(userId: string, taskId: string, id: string, session: ClientSession) {
@@ -87,8 +88,9 @@ export function commentService(
         requireEditable(project)
         await validateMentions(project, fields.mentionUserIds, session)
         const created = await repository.create(taskId, userId, fields, session)
+        const recipients = await notifications.mentions(taskId, created.id, created.revision, userId, fields.mentionUserIds, session)
         const [result] = await render([created], session)
-        return result
+        return { result, recipients }
       })
     },
 
@@ -102,8 +104,9 @@ export function commentService(
         const introduced = fields.mentionUserIds.filter((userId) => !before.includes(userId))
         const updated = await repository.update(taskId, id, userId, fields, introduced, session)
         if (!updated) throw commentNotFound()
+        const recipients = await notifications.mentions(taskId, id, updated.revision, userId, introduced, session)
         const [result] = await render([updated], session)
-        return result
+        return { result, recipients }
       })
     },
 
@@ -113,6 +116,7 @@ export function commentService(
         requireEditable(project)
         const deleted = await repository.remove(taskId, id, userId, session)
         if (!deleted.deletedCount) throw commentNotFound()
+        return { result: undefined }
       })
     },
   }

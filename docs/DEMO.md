@@ -118,3 +118,17 @@ npm --prefix backend run test:e2e -- kanban-drag-drop.e2e.ts
 ```sh
 npm --prefix backend run test:e2e -- realtime.e2e.ts
 ```
+
+## M24 notifications walkthrough
+
+1. Sign in as an Owner or assigned Manager and as a Developer on the project, using separate browser profiles. Assign a task to the Developer and mention them in a comment.
+2. In the Developer’s profile, click the bell in the top bar. The inbox opens over the current page and the URL stays the same. Check the assignment and mention entries. Press **Escape** or click outside to dismiss the inbox. Reopen it, mark one item as read, then refresh and reopen the inbox to confirm that the count and read state persist. Open the task link from the other entry.
+3. As Developer, move the task to **In Review**. The assigned Manager should see **Task ready for review** in their inbox. As Manager, move the task to **Done**, then back to **To Do**. The Developer should see one **Task reopened** notification with a link to the task.
+4. Give the assigned unfinished task a due date within the UTC reminder window. Check the Developer’s inbox after the next deadline scan. The server scans on startup and every 15 minutes.
+5. As Owner, invite an existing account by its email. The account sees an informational workspace invitation in its inbox. Share the acceptance link through the existing invitation flow.
+6. Remove the Developer from the project. Refresh or reopen their inbox and confirm the affected items display **Item unavailable** while keeping their read state.
+
+```sh
+npm --prefix backend run test:e2e -- notifications.e2e.ts
+npm --prefix backend run test:db
+```

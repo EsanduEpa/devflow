@@ -23,6 +23,7 @@ type ClientEvents = {
   'project:unsubscribe': (input: unknown, ack?: (reply: SubscriptionReply) => void) => void
 }
 type ServerEvents = {
+  'notifications:changed': () => void
   'project:changed': (event: ProjectChange & { eventId: string }) => void
   'project:access-revoked': (event: { projectId: string }) => void
 }
@@ -196,6 +197,17 @@ export function createRealtime(config: AuthConfig, checkIntervalMs = 15_000) {
 
     publish(change: ProjectChange) {
       enqueue(() => send(change))
+    },
+
+    notifyRecipients(recipientIds: string[]) {
+      if (!recipientIds.length) return
+      const recipients = new Set(recipientIds)
+      enqueue(async () => {
+        const sockets = [...(io?.sockets.sockets.values() ?? [])].filter((socket) => recipients.has(socket.data.userId))
+        await Promise.all(sockets.map(async (socket) => {
+          if (await sessionIsCurrent(socket) && socket.data.expiresAt > Date.now()) socket.emit('notifications:changed')
+        }))
+      })
     },
 
     workspaceChanged(workspaceId: string) {

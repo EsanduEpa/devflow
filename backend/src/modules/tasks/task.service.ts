@@ -4,6 +4,7 @@ import type { ActivityRepository } from '../activity/activity.repository.js'
 import { recordTaskActivity } from '../activity/task-activity.js'
 import type { CommentRepository } from '../comments/comment.repository.js'
 import type { DependencyRepository } from '../dependencies/dependency.repository.js'
+import type { NotificationTriggers } from '../notifications/notification-triggers.js'
 import type { ProjectRecord } from '../projects/project.model.js'
 import type { ProjectService } from '../projects/project.service.js'
 import type { WorkspaceService } from '../workspaces/workspace.service.js'
@@ -20,6 +21,7 @@ function taskNotFound() {
 export function taskService(
   repository: TaskRepository, projects: ProjectService, workspaces: WorkspaceService,
   sprints: Pick<SprintRepository, 'find'>, comments: Pick<CommentRepository, 'removeForTask'>,
+  notifications: NotificationTriggers,
   activity: Pick<ActivityRepository, 'append' | 'removeForTask'>, dependencies: Pick<DependencyRepository, 'removeForTask'>,
 ) {
   async function requireTaskAccess(userId: string, taskId: string, session?: ClientSession) {
@@ -68,8 +70,9 @@ export function taskService(
         await validateAssignee(project, fields.assigneeId, session)
         const task = await repository.create(projectId, userId, fields, session)
         await recordTaskActivity(activity, task, userId, null, session)
-        return publicTask(task)
-      })
+        const recipients = await notifications.task(project, task, userId, null, session)
+        return { result: publicTask(task), recipients }
+      }).then(notifications.committed)
     },
 
     async details(userId: string, taskId: string) {
@@ -105,8 +108,9 @@ export function taskService(
         const updated = await repository.updateStatus(taskId, userId, status, session, expectedVersion)
         if (!updated) throw expectedVersion === undefined ? taskNotFound() : staleTaskVersion()
         await recordTaskActivity(activity, updated, userId, task, session)
-        return publicTask(updated)
-      })
+        const recipients = await notifications.task(project, updated, userId, task, session)
+        return { result: publicTask(updated), recipients }
+      }).then(notifications.committed)
     },
 
     update(userId: string, taskId: string, { expectedVersion, ...fields }: TaskUpdateInput['body']) {
@@ -115,8 +119,9 @@ export function taskService(
         const updated = await repository.update(taskId, userId, fields, session, expectedVersion)
         if (!updated) throw expectedVersion === undefined ? taskNotFound() : staleTaskVersion()
         await recordTaskActivity(activity, updated, userId, task, session)
-        return publicTask(updated)
-      })
+        const recipients = await notifications.task(project, updated, userId, task, session)
+        return { result: publicTask(updated), recipients }
+      }).then(notifications.committed)
     },
 
     remove(userId: string, taskId: string) {

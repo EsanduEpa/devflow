@@ -17,6 +17,7 @@ const collections = {
   comment: { comments: `m10_comments_${suffix}` },
   activity: { activity: `m10_activity_${suffix}` },
   dependency: { dependencies: `m10_dependencies_${suffix}` },
+  notification: { notifications: `m10_notifications_${suffix}` },
 }
 const origin = 'http://127.0.0.1:5173'
 const api = '/api/v1'

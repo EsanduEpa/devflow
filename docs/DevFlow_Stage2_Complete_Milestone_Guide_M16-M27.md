@@ -323,16 +323,18 @@ The current `test:db` script lists its test files explicitly. Add each new datab
 
 **Outcome** Recipients can open an inbox, view unread counts, mark notifications as read, and follow links to related work.
 
+**Evidence** [M24 verification](engineering-notes/018-m24-notification-verification.md) · [Notifications API](API_REFERENCE.md#notifications) · [Demo](DEMO.md#m24-notifications-walkthrough)
+
 **Prerequisites** M18–M19 for committed activity and M23 for live refresh.
 
 **Study and understand** Recipient scoping, durable notification records, idempotency, and time-based triggers.
 
 **Steps to complete**
 
-1. [ ] Define recipients and deduplication for assignment, mention, approaching deadline, and review. Use the documented M16 mapping for invitations. Stage 1 invitations are workspace-scoped and manually shared, so an inbox entry needs an eligible, identified recipient.
-2. [ ] Persist recipient-scoped notifications and read state. Define the deadline window, time handling, and duplicate suppression within the Stage 2 application.
-3. [ ] Add inbox list, unread-count, and mark-as-read operations. Validate access to linked tasks and projects when followed and handle inaccessible items safely.
-4. [ ] Add the notification indicator and inbox in the Studio UI. Refresh the inbox after reconnect and when a recipient-scoped notification signal arrives.
+1. [x] Define recipients and deduplication for assignment, mention, approaching deadline, and review. Use the documented M16 mapping for invitations. Stage 1 invitations are workspace-scoped and manually shared, so an inbox entry needs an eligible, identified recipient.
+2. [x] Persist recipient-scoped notifications and read state. Define the deadline window, time handling, and duplicate suppression within the Stage 2 application.
+3. [x] Add inbox list, unread-count, and mark-as-read operations. Validate access to linked tasks and projects when followed and handle inaccessible items safely.
+4. [x] Add the notification indicator and inbox in the Studio UI. Refresh the inbox after reconnect and when a recipient-scoped notification signal arrives.
 
 **Verify and test** Assign a task, mention another member, move a task to review, and exercise the documented deadline and invitation cases. Check the unread count, repeat a triggering operation where safe, and verify read state across sessions. Confirm another user cannot read or modify the item.
 
