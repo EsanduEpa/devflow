@@ -9,6 +9,15 @@ import { sessionLifetime } from './session.model.js'
 export async function authService(repository: AuthRepository) {
   const dummyPasswordHash = await hashPassword(randomToken())
 
+  async function currentSession(token?: string) {
+    const session = token && await repository.findActiveSession(hashToken(token))
+    const user = session && await repository.findUser(session.userId)
+    if (!session || !user || session.passwordVersion !== user.passwordVersion) {
+      throw new ApiError(401, 'UNAUTHENTICATED', 'Log in to continue.')
+    }
+    return { user: publicUser(user), expiresAt: session.expiresAt }
+  }
+
   return {
     async register({ name, email, password }: Registration) {
       const passwordHash = await hashPassword(password)
@@ -40,13 +49,10 @@ export async function authService(repository: AuthRepository) {
     },
 
     async currentUser(token?: string) {
-      const session = token && await repository.findActiveSession(hashToken(token))
-      const user = session && await repository.findUser(session.userId)
-      if (!session || !user || session.passwordVersion !== user.passwordVersion) {
-        throw new ApiError(401, 'UNAUTHENTICATED', 'Log in to continue.')
-      }
-      return publicUser(user)
+      return (await currentSession(token)).user
     },
+
+    currentSession,
 
     async logout(token?: string) {
       if (token) {

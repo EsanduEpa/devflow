@@ -3,6 +3,7 @@ import { ApiError } from '../../shared/api-error.js'
 import type { PageRequest } from '../../shared/pagination.js'
 import type { ProjectRecord } from '../projects/project.model.js'
 import type { ProjectService } from '../projects/project.service.js'
+import type { Realtime } from '../realtime/realtime.js'
 import type { TaskService } from '../tasks/task.service.js'
 import type { WorkspaceService } from '../workspaces/workspace.service.js'
 import type { CommentRecord, CommentRepository } from './comment.repository.js'
@@ -18,7 +19,7 @@ function requireEditable(project: ProjectRecord) {
 
 export function commentService(
   repository: CommentRepository, tasks: Pick<TaskService, 'requireAccess'>,
-  projects: Pick<ProjectService, 'listAccessUsers'>, workspaces: Pick<WorkspaceService, 'lockMemberships'>,
+  projects: Pick<ProjectService, 'listAccessUsers'>, workspaces: Pick<WorkspaceService, 'lockMemberships'>, live?: Realtime,
 ) {
   async function render(records: CommentRecord[], session?: ClientSession) {
     if (!records.length) return []
@@ -45,14 +46,16 @@ export function commentService(
     throw new ApiError(400, 'VALIDATION_ERROR', message, [{ field: 'body.mentionUserIds', message }])
   }
 
-  function write<T>(
+  async function write<T>(
     userId: string, taskId: string, operation: (project: ProjectRecord, session: ClientSession) => Promise<T>,
   ) {
-    return repository.transaction(async (session) => {
+    const { projectId, result } = await repository.transaction(async (session) => {
       const { project } = await tasks.requireAccess(userId, taskId, session)
       await workspaces.lockMemberships(project.workspaceId.toString(), session)
-      return operation(project, session)
+      return { projectId: project._id.toString(), result: await operation(project, session) }
     })
+    live?.publish({ projectId, kind: 'comment.changed', taskId })
+    return result
   }
 
   async function requireAuthor(userId: string, taskId: string, id: string, session: ClientSession) {

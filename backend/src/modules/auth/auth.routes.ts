@@ -19,6 +19,7 @@ import { passwordResetModel } from './password-reset.model.js'
 import { passwordResetRepository } from './password-reset.repository.js'
 import { passwordResetService } from './password-reset.service.js'
 import { sessionModel } from './session.model.js'
+import type { Realtime } from '../realtime/realtime.js'
 
 function authLimiter(limit: number) {
   return rateLimit({
@@ -39,6 +40,7 @@ export async function createAuthModule(
   config: AuthConfig,
   emailConfig: ResetEmailConfig,
   collections?: AuthCollections,
+  live?: Realtime,
 ) {
   const users = userModel(connection, collections?.users)
   const sessions = sessionModel(connection, collections?.sessions)
@@ -60,12 +62,12 @@ export async function createAuthModule(
   })
   router.get('/auth/csrf', csrf.issueToken)
   router.post('/auth/register', csrf.verifyToken, authLimiter(5), validateRequest(registerSchema), controller.register)
-  router.post('/auth/login', csrf.verifyToken, authLimiter(10), validateRequest(loginSchema), controller.login)
-  router.post('/auth/logout', csrf.verifyToken, validateRequest(logoutSchema), controller.logout)
+  router.post('/auth/login', csrf.verifyToken, authLimiter(10), validateRequest(loginSchema), live?.protect(controller.login) ?? controller.login)
+  router.post('/auth/logout', csrf.verifyToken, validateRequest(logoutSchema), live?.protect(controller.logout) ?? controller.logout)
   router.get('/auth/me', requireUser, controller.currentUser)
   router.post('/auth/forgot-password', csrf.verifyToken, authLimiter(5), validateRequest(forgotPasswordSchema), controller.forgotPassword)
-  router.post('/auth/reset-password', csrf.verifyToken, authLimiter(10), validateRequest(resetPasswordSchema), controller.resetPassword)
-  router.use('/users', userRoutes(users, sessions, service, cookies, csrf.verifyToken, authLimiter(10)))
+  router.post('/auth/reset-password', csrf.verifyToken, authLimiter(10), validateRequest(resetPasswordSchema), live?.protect(controller.resetPassword) ?? controller.resetPassword)
+  router.use('/users', userRoutes(users, sessions, service, cookies, csrf.verifyToken, authLimiter(10), live))
 
-  return { router, requireUser, verifyCsrf: csrf.verifyToken, users }
+  return { router, service, requireUser, verifyCsrf: csrf.verifyToken, users }
 }

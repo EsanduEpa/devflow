@@ -9,6 +9,7 @@ import { projectController } from './project.controller.js'
 import { projectRepository, type ProjectModels } from './project.repository.js'
 import { projectCreateSchema, projectDetailsSchema, projectListSchema, projectMemberAddSchema, projectMemberRemoveSchema, projectUpdateSchema } from './project.schemas.js'
 import { projectService } from './project.service.js'
+import type { Realtime } from '../realtime/realtime.js'
 
 export type ProjectCollections = { projects: string; members: string }
 
@@ -21,10 +22,11 @@ export async function createProjectRoutes(
   },
   workspaces: { service: WorkspaceService; members: ReturnType<typeof workspaceMemberModel> },
   tasks: Pick<TaskRepository, 'unassignInProject'>,
+  live?: Realtime,
 ) {
   await Promise.all([projects.createIndexes(), members.createIndexes()])
   const service = projectService(projectRepository(projects, members, workspaces.members, users), workspaces.service, tasks)
-  const controller = projectController(service)
+  const controller = projectController(service, live)
 
   const noStore: RequestHandler = (_request, response, next) => {
     response.set('Cache-Control', 'no-store')
@@ -36,10 +38,10 @@ export async function createProjectRoutes(
 
   const projectDetails = Router()
   projectDetails.get('/:id', noStore, requireUser, validateRequest(projectDetailsSchema), controller.details)
-  projectDetails.patch('/:id', noStore, requireUser, verifyCsrf, validateRequest(projectUpdateSchema), controller.update)
+  projectDetails.patch('/:id', noStore, requireUser, verifyCsrf, validateRequest(projectUpdateSchema), live?.protect(controller.update) ?? controller.update)
   projectDetails.get('/:id/members', noStore, requireUser, validateRequest(projectDetailsSchema), controller.listMembers)
   projectDetails.post('/:id/members', noStore, requireUser, verifyCsrf, validateRequest(projectMemberAddSchema), controller.addMember)
-  projectDetails.delete('/:id/members/:userId', noStore, requireUser, verifyCsrf, validateRequest(projectMemberRemoveSchema), controller.removeMember)
+  projectDetails.delete('/:id/members/:userId', noStore, requireUser, verifyCsrf, validateRequest(projectMemberRemoveSchema), live?.protect(controller.removeMember) ?? controller.removeMember)
 
   return { workspaceProjects, projectDetails, service }
 }

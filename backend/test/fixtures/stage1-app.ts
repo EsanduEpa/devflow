@@ -8,9 +8,10 @@ import mongoose from 'mongoose'
 import { createApi } from '../../src/api.js'
 import { createApp } from '../../src/app.js'
 import { authConfig } from '../../src/config/auth.js'
+import { createRealtime, type Realtime } from '../../src/modules/realtime/realtime.js'
 import { connectDatabase } from '../../src/config/database.js'
 
-export async function startStage1App(purpose: 'browser' | 'performance' | 'sprint' | 'comment' | 'activity' | 'dependency' | 'conflict') {
+export async function startStage1App(purpose: 'browser' | 'performance' | 'sprint' | 'comment' | 'activity' | 'dependency' | 'conflict' | 'realtime') {
   const uri = process.env.MONGODB_TEST_URI?.trim() || process.env.MONGODB_URI?.trim()
   if (!uri) throw new Error('Set MONGODB_TEST_URI or MONGODB_URI in backend/.env to run Stage 1 checks.')
 
@@ -27,9 +28,11 @@ export async function startStage1App(purpose: 'browser' | 'performance' | 'sprin
     dependency: { dependencies: name('dependencies') },
   }
   const server = createServer()
+  let live: Realtime | undefined
 
   async function close() {
     try {
+      await live?.close()
       if (server.listening) {
         await new Promise<void>((resolve) => {
           server.close(() => resolve())
@@ -57,7 +60,10 @@ export async function startStage1App(purpose: 'browser' | 'performance' | 'sprin
     const connection = await connectDatabase(uri, 'devflow_test')
     const config = authConfig({ APP_ORIGINS: origin, CSRF_SECRET: randomBytes(32).toString('hex') })
     const email = { origin, async sendResetEmail() { throw new Error('Stage 1 browser and timing checks do not deliver email.') } }
-    const api = createApp(await createApi(connection, config, email, collections))
+    if (purpose === 'browser' || purpose === 'realtime') {
+      live = createRealtime(config, purpose === 'realtime' ? 500 : undefined)
+    }
+    const api = createApp(await createApi(connection, config, email, collections, live))
 
     if (purpose === 'browser') {
       const frontendDist = fileURLToPath(new URL('../../../frontend/dist/', import.meta.url))
@@ -73,7 +79,8 @@ export async function startStage1App(purpose: 'browser' | 'performance' | 'sprin
       server.on('request', api)
     }
 
-    return { origin, database: connection.db!, collections, close }
+    const realtimeServer = live?.attach(server)
+    return { origin, realtimeServer, database: connection.db!, collections, close }
   } catch {
     await close()
     throw new Error('Could not start the Stage 1 test app. Check local server permissions, Atlas access, and devflow_test permissions.')

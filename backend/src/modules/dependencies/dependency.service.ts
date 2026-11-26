@@ -1,5 +1,6 @@
 import { mongo, type ClientSession, type Types } from 'mongoose'
 import { ApiError } from '../../shared/api-error.js'
+import type { Realtime } from '../realtime/realtime.js'
 import type { TaskService } from '../tasks/task.service.js'
 import type { WorkspaceService } from '../workspaces/workspace.service.js'
 import { dependencyPairIndex, resolvedPrerequisiteStatus } from './dependency.model.js'
@@ -26,12 +27,13 @@ export function dependencyService(
   repository: DependencyRepository,
   tasks: Pick<TaskService, 'requireAccess'>,
   workspaces: Pick<WorkspaceService, 'lockMemberships'>,
+  live?: Realtime,
 ) {
-  function manage<T>(
+  async function manage<T>(
     userId: string, taskId: string, prerequisiteId: string,
     operation: (projectId: Types.ObjectId, session: ClientSession) => Promise<T>,
   ) {
-    return repository.transaction(async (session) => {
+    const { projectId, result } = await repository.transaction(async (session) => {
       const { project, canManage } = await tasks.requireAccess(userId, taskId, session)
       if (!canManage) throw new ApiError(403, 'FORBIDDEN', 'Only the workspace owner or assigned project manager can manage dependencies.')
       if (project.status === 'ARCHIVED') {
@@ -45,8 +47,10 @@ export function dependencyService(
         const message = 'Choose a different task in this project as the prerequisite.'
         throw new ApiError(400, 'VALIDATION_ERROR', message, [{ field: 'params.prerequisiteId', message }])
       }
-      return operation(project._id, session)
+      return { projectId: project._id.toString(), result: await operation(project._id, session) }
     })
+    live?.publish({ projectId, kind: 'project.changed' })
+    return result
   }
 
   return {

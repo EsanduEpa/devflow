@@ -139,3 +139,16 @@ A dependency from A to B means A waits for B. Project readers can view dependenc
 Both task arrays contain `{ id, title, status }`, ordered by title then ID. `prerequisites` are tasks the current task waits for. `dependents` are tasks waiting for the current task. A task is blocked when at least one direct prerequisite has a status other than `DONE`. Completing or reopening a prerequisite changes the derived result. This indicator is informational and task status transitions follow their existing rules.
 
 Self-links and visible cross-project endpoints return `400`. An inaccessible or missing task returns `404`. A duplicate or cycle returns the corresponding `409` code. Permanently deleting a task removes dependency links in both directions.
+
+## Project live updates
+
+Socket.IO uses WebSocket transport at `/socket.io` on the same server as REST. The handshake requires the current session cookie and an origin in `APP_ORIGINS`. Writes continue through the REST endpoints.
+
+| Event | Direction | Payload or acknowledgement |
+| --- | --- | --- |
+| `project:subscribe` | Client → server | `{ projectId }`. Acknowledges with `{ data: { projectId } }` or `{ error: { code, message } }`. Invalid IDs return `VALIDATION_ERROR` and missing or inaccessible projects return `NOT_FOUND`. |
+| `project:unsubscribe` | Client → server | Same input and envelope. Unsubscribe is idempotent. |
+| `project:changed` | Server → client | `{ eventId, projectId, kind, taskId?, version? }`. Kinds are `task.changed`, `task.deleted`, `comment.changed`, `sprint.changed`, and `project.changed`. A changed task includes its committed version. |
+| `project:access-revoked` | Server → client | `{ projectId }` sent privately to an affected session when its subscription is removed. |
+
+Project signals are published after the corresponding REST commit. Active sessions and project access are revalidated before delivery. Session revocation disconnects the socket. Clients resubscribe and refetch authorized data after reconnecting. Delivery is a hint to refresh the affected views. [Socket.IO delivery guarantees](https://socket.io/docs/v4/delivery-guarantees/)

@@ -1,6 +1,7 @@
 import { Router, type RequestHandler } from 'express'
 import type { authenticate } from '../../middleware/authenticate.js'
 import { validateRequest } from '../../middleware/validate-request.js'
+import type { Realtime } from '../realtime/realtime.js'
 import { taskController } from './task.controller.js'
 import { taskCreateSchema, taskDetailsSchema, taskListSchema, taskStatusSchema, taskUpdateSchema } from './task.schemas.js'
 import type { TaskService } from './task.service.js'
@@ -8,8 +9,8 @@ import type { TaskService } from './task.service.js'
 export function createTaskRoutes(service: TaskService, { requireUser, verifyCsrf }: {
   requireUser: ReturnType<typeof authenticate>
   verifyCsrf: RequestHandler
-}) {
-  const controller = taskController(service)
+}, live?: Realtime) {
+  const controller = taskController(service, live)
   const noStore: RequestHandler = (_request, response, next) => {
     response.set('Cache-Control', 'no-store')
     next()

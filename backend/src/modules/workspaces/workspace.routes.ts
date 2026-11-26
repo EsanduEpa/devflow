@@ -16,6 +16,7 @@ import { workspaceModel } from './workspace.model.js'
 import { workspaceRepository } from './workspace.repository.js'
 import { workspaceCreateSchema, workspaceDetailsSchema, workspaceListSchema, workspaceMemberRemoveSchema, workspaceMemberRoleSchema, workspaceUpdateSchema } from './workspace.schemas.js'
 import { workspaceService } from './workspace.service.js'
+import type { Realtime } from '../realtime/realtime.js'
 
 export type WorkspaceCollections = { workspaces: string; members: string; invitations: string }
 
@@ -29,6 +30,7 @@ export async function createWorkspaceRoutes(
   projectModels: ProjectModels,
   tasks: Pick<TaskRepository, 'unassignInWorkspace'>,
   collections?: WorkspaceCollections,
+  live?: Realtime,
 ) {
   const workspaces = workspaceModel(connection, collections?.workspaces)
   const members = workspaceMemberModel(connection, collections?.members)
@@ -37,7 +39,7 @@ export async function createWorkspaceRoutes(
 
   const repository = workspaceRepository(workspaces, members, users, projectModels)
   const service = workspaceService(repository, tasks)
-  const controller = workspaceController(service)
+  const controller = workspaceController(service, live)
   const invitations = invitationController(invitationService(invitationRepository(invitationModel, workspaces, members, users), repository, service))
   const router = Router()
   router.use((_request, response, next) => {
@@ -49,8 +51,8 @@ export async function createWorkspaceRoutes(
   router.get('/:id', requireUser, validateRequest(workspaceDetailsSchema), controller.details)
   router.patch('/:id', requireUser, verifyCsrf, validateRequest(workspaceUpdateSchema), controller.update)
   router.get('/:id/members', requireUser, validateRequest(workspaceDetailsSchema), controller.listMembers)
-  router.patch('/:id/members/:userId', requireUser, verifyCsrf, validateRequest(workspaceMemberRoleSchema), controller.changeMemberRole)
-  router.delete('/:id/members/:userId', requireUser, verifyCsrf, validateRequest(workspaceMemberRemoveSchema), controller.removeMember)
+  router.patch('/:id/members/:userId', requireUser, verifyCsrf, validateRequest(workspaceMemberRoleSchema), live?.protect(controller.changeMemberRole) ?? controller.changeMemberRole)
+  router.delete('/:id/members/:userId', requireUser, verifyCsrf, validateRequest(workspaceMemberRemoveSchema), live?.protect(controller.removeMember) ?? controller.removeMember)
   router.get('/:id/invitations', requireUser, validateRequest(invitationListSchema), invitations.list)
   router.post('/:id/invitations', requireUser, verifyCsrf, validateRequest(invitationCreateSchema), invitations.create)
 

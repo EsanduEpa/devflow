@@ -107,3 +107,14 @@ npm --prefix backend run test:e2e -- task-conflicts.e2e.ts
 ```sh
 npm --prefix backend run test:e2e -- kanban-drag-drop.e2e.ts
 ```
+
+## M23 live update walkthrough
+
+1. Open the same project board as the Owner or assigned Manager and a Developer, using separate browser profiles.
+2. Assign a task to the Developer. Drag it to a different status column and post a comment. The Developer’s board and open task details catch up without reloading.
+3. Put the Developer’s browser offline. As the Manager, update the task and post another comment. Bring the Developer’s browser back online. The board and discussion reload with the saved values.
+4. Remove the Developer from the project while their browser is connected. Their project view clears and displays an access denial. A signed-in outsider opening the project link also receives an access denial.
+
+```sh
+npm --prefix backend run test:e2e -- realtime.e2e.ts
+```
