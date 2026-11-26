@@ -17,6 +17,7 @@ const collections = {
   comment: { comments: `m5_comments_${suffix}` },
   activity: { activity: `m5_activity_${suffix}` },
   dependency: { dependencies: `m5_dependencies_${suffix}` },
+  notification: { notifications: `m5_notifications_${suffix}` },
 }
 const origin = 'http://127.0.0.1:5173'
 const auth = '/api/v1/auth'

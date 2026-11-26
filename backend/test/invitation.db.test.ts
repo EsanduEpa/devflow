@@ -18,6 +18,7 @@ const collections = {
   comment: { comments: `m6_comments_${suffix}` },
   activity: { activity: `m6_activity_${suffix}` },
   dependency: { dependencies: `m6_dependencies_${suffix}` },
+  notification: { notifications: `m6_notifications_${suffix}` },
 }
 const origin = 'http://127.0.0.1:5173'
 const auth = '/api/v1/auth'

@@ -1,3 +1,4 @@
+import type { NotificationTriggers } from '../notifications/notification-triggers.js'
 import type { userModel } from '../users/user.model.js'
 import type { workspaceMemberModel } from './workspace-member.model.js'
 import { invitationLifetime, type InvitationStatus, type workspaceInvitationModel } from './workspace-invitation.model.js'
@@ -9,6 +10,7 @@ export function invitationRepository(
   workspaces: ReturnType<typeof workspaceModel>,
   members: ReturnType<typeof workspaceMemberModel>,
   users: ReturnType<typeof userModel>,
+  notifications: NotificationTriggers,
 ) {
   return {
     create(workspaceId: string, invitedBy: string, fields: InvitationCreateInput['body'], tokenHash: string) {
@@ -29,8 +31,10 @@ export function invitationRepository(
           createdAt: now,
           expiresAt: new Date(now.getTime() + invitationLifetime),
         }).save({ session })
-        return { outcome: 'created', invitation } as const
-      })
+        const recipients = await notifications.invitation(invitation.id, user?._id.toString(), invitedBy, session)
+        return { outcome: 'created', invitation, recipients } as const
+      }).then((result) => result.outcome === 'created'
+        ? notifications.committed({ result, recipients: result.recipients }) : result)
     },
 
     list(workspaceId: string, status: InvitationStatus | undefined, now: Date) {
@@ -73,7 +77,8 @@ export function invitationRepository(
         if (!claim.matchedCount) return { outcome: 'closed' } as const
         await new members({ ...membership, role: invitation.role, joinedAt: acceptedAt }).save({ session })
         return { outcome: 'accepted', workspace, role: invitation.role } as const
-      })
+      }).then((result) => result.outcome === 'accepted'
+        ? notifications.committed({ result, recipients: [userId] }) : result)
     },
   }
 }

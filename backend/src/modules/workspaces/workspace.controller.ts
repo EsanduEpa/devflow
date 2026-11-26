@@ -41,6 +41,7 @@ export function workspaceController(service: WorkspaceService, live?: Realtime) 
   const removeMember: WorkspaceRequest<WorkspaceMemberRemoveInput> = async (_request, response) => {
     const { user, input } = response.locals
     await service.removeMember(user.id, input.params.id, input.params.userId)
+    live?.notifyRecipients([input.params.userId])
     live?.workspaceChanged(input.params.id)
     response.status(204).end()
   }

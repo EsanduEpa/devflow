@@ -2,6 +2,7 @@ import { Router, type RequestHandler } from 'express'
 import type { Connection } from 'mongoose'
 import type { authenticate } from '../../middleware/authenticate.js'
 import { validateRequest } from '../../middleware/validate-request.js'
+import type { NotificationTriggers } from '../notifications/notification-triggers.js'
 import type { ProjectModels } from '../projects/project.repository.js'
 import type { TaskRepository } from '../tasks/task.repository.js'
 import type { userModel } from '../users/user.model.js'
@@ -29,6 +30,7 @@ export async function createWorkspaceRoutes(
   },
   projectModels: ProjectModels,
   tasks: Pick<TaskRepository, 'unassignInWorkspace'>,
+  notifications: NotificationTriggers,
   collections?: WorkspaceCollections,
   live?: Realtime,
 ) {
@@ -40,7 +42,7 @@ export async function createWorkspaceRoutes(
   const repository = workspaceRepository(workspaces, members, users, projectModels)
   const service = workspaceService(repository, tasks)
   const controller = workspaceController(service, live)
-  const invitations = invitationController(invitationService(invitationRepository(invitationModel, workspaces, members, users), repository, service))
+  const invitations = invitationController(invitationService(invitationRepository(invitationModel, workspaces, members, users, notifications), repository, service))
   const router = Router()
   router.use((_request, response, next) => {
     response.set('Cache-Control', 'no-store')
@@ -63,5 +65,5 @@ export async function createWorkspaceRoutes(
   })
   invitationRouter.get('/:token', validateRequest(invitationPreviewSchema), invitations.preview)
   invitationRouter.post('/:token/accept', requireUser, verifyCsrf, validateRequest(invitationAcceptSchema), invitations.accept)
-  return { router, invitationRouter, service, members }
+  return { router, invitationRouter, service, members, workspaces, invitationModel }
 }

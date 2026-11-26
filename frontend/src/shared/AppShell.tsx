@@ -1,3 +1,5 @@
+import { NotificationBell } from '../features/notifications/NotificationBell'
+import { useLiveSocket } from '../features/realtime/useLiveSocket'
 import { useProjectLive } from '../features/realtime/useProjectLive'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -114,7 +116,9 @@ export function AppShell({ user, theme, onToggle, current, children }: {
   const canManage = workspace?.myRole === 'OWNER' || (workspace?.myRole === 'MANAGER' && project?.managerId === user.id)
 
   const openTaskId = matchPath('/tasks/:taskId', actual.pathname)?.params.taskId?.toLowerCase()
+  const socket = useLiveSocket(user.id)
   useProjectLive({
+    socket,
     userId: user.id,
     projectId: project?.id,
     workspaceId: project?.workspaceId,
@@ -198,7 +202,10 @@ export function AppShell({ user, theme, onToggle, current, children }: {
               </>}
             </nav>
           </div>
-          <AccountMenu key={actual.key} user={user} theme={theme} onToggle={onToggle} />
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            <NotificationBell userId={user.id} />
+            <AccountMenu key={actual.key} user={user} theme={theme} onToggle={onToggle} />
+          </div>
         </header>
         <main id="main-content" tabIndex={-1} className="app-content">
           {accessLost ? <section className="ui-panel max-w-xl">

@@ -24,6 +24,7 @@ taskSchema.index({ projectId: 1, createdAt: -1, _id: -1 })
 taskSchema.index({ projectId: 1, assigneeId: 1 })
 taskSchema.index({ projectId: 1, priority: 1 })
 taskSchema.index({ projectId: 1, dueDate: 1 })
+taskSchema.index({ dueDate: 1 })
 taskSchema.index({ projectId: 1, title: 'text' })
 
 export function taskModel(connection: Connection, collection = 'tasks') {

@@ -5,6 +5,7 @@ import { AuthForm } from './features/auth/AuthForm'
 import { ForgotPasswordForm, ResetPasswordForm } from './features/auth/RecoveryForms'
 import { authErrorMessage, currentUser, type PublicUser } from './features/auth/api'
 import { afterAuthentication, readInvitationToken } from './features/auth/invitation-return'
+import { NotificationInbox } from './features/notifications/NotificationInbox'
 import { AccountSettings } from './features/profile/AccountSettings'
 import { ProjectDetailsPage } from './features/projects/ProjectDetailsPage'
 import { ProjectSprintsPage } from './features/sprints/ProjectSprintsPage'
@@ -72,6 +73,7 @@ export default function App() {
         <Route path="/" element={user ? <Navigate to="/workspaces" replace /> : loginRedirect} />
         <Route path="/login" element={user ? <Navigate to={signedInPath} replace /> : <AuthForm key="login" onLogin={() => setLoginNotice(null)} />} />
         <Route path="/register" element={user ? <Navigate to={signedInPath} replace /> : <AuthForm key="register" isRegistration />} />
+        <Route path="/notifications" element={user ? <NotificationInbox key={user.id} userId={user.id} /> : loginRedirect} />
         <Route path="/profile" element={user ? <AccountSettings user={user} onPasswordChanged={passwordChanged} /> : loginRedirect} />
         <Route path="/workspaces/*" element={user ? <Workspaces key={user.id} userId={user.id} /> : loginRedirect} />
         <Route path="/projects/:projectId" element={user ? <ProjectDetailsPage key={user.id} userId={user.id} /> : loginRedirect} />
