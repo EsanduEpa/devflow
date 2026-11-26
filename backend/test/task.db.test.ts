@@ -386,6 +386,7 @@ describe('Project dashboard', () => {
     const route = `${empty.url}/dashboard`
     const expected = { data: {
       projectId: empty.id, totalTasks: 0, completedTasks: 0, inProgressTasks: 0, overdueTasks: 0, completionPercentage: 0,
+      priorityCounts: { LOW: 0, MEDIUM: 0, HIGH: 0, URGENT: 0 }, sprintProgress: [],
     } }
 
     await owner.client.get(route).expect('Cache-Control', 'no-store').expect(200, expected)
@@ -420,7 +421,8 @@ describe('Project dashboard', () => {
     ])
 
     const route = `${current.url}/dashboard`
-    const initial = { projectId: current.id, totalTasks: 6, completedTasks: 1, inProgressTasks: 1, overdueTasks: 2, completionPercentage: 16.67 }
+    const initial = { projectId: current.id, totalTasks: 6, completedTasks: 1, inProgressTasks: 1, overdueTasks: 2, completionPercentage: 16.67,
+      priorityCounts: { LOW: 0, MEDIUM: 6, HIGH: 0, URGENT: 0 }, sprintProgress: [] }
     await developer.client.get(route).expect(200, { data: initial })
 
     await mutate(owner.client, 'patch', `${active.url}/status`, 200, { status: 'DONE' })
@@ -431,6 +433,7 @@ describe('Project dashboard', () => {
 
     await mutate(owner.client, 'patch', current.url, 200, { status: 'ACTIVE' })
     await mutate(owner.client, 'delete', active.url, 204)
-    await owner.client.get(route).expect(200, { data: { ...updated, totalTasks: 5, completedTasks: 1, completionPercentage: 20 } })
+    await owner.client.get(route).expect(200, { data: { ...updated, totalTasks: 5, completedTasks: 1, completionPercentage: 20,
+      priorityCounts: { ...updated.priorityCounts, MEDIUM: 5 } } })
   }, 55_000)
 })

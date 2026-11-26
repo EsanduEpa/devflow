@@ -5,6 +5,10 @@ import type { SprintCounts, SprintStatus, sprintModel } from './sprint.model.js'
 import type { SprintCreateFields } from './sprint.schemas.js'
 
 export function sprintRepository(sprints: ReturnType<typeof sprintModel>) {
+  function pageItems(projectId: string, { page, limit }: PageRequest) {
+    return sprints.find({ projectId }).sort({ startDate: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean().exec()
+  }
+
   return {
     transaction<T>(operation: (session: ClientSession) => Promise<T>) {
       return sprints.db.transaction(operation)
@@ -19,12 +23,18 @@ export function sprintRepository(sprints: ReturnType<typeof sprintModel>) {
       return sprints.findById(id).session(session ?? null).lean().exec()
     },
 
-    async list(projectId: string, { page, limit }: PageRequest) {
+    async list(projectId: string, query: PageRequest) {
       const [items, total] = await Promise.all([
-        sprints.find({ projectId }).sort({ startDate: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean().exec(),
+        pageItems(projectId, query),
         sprints.countDocuments({ projectId }).exec(),
       ])
       return { items, total }
+    },
+
+    pageItems,
+
+    active(projectId: string) {
+      return sprints.findOne({ projectId, status: 'ACTIVE' }).lean().exec()
     },
 
     transition(id: string, from: SprintStatus, fields: {

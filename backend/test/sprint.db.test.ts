@@ -202,7 +202,55 @@ it('rolls back partially written tasks and freezes progress after valid rollover
   await (await write(manager.client, 'delete', done.path)).call.expect(204)
   const saved = await manager.client.get(api + original.path).expect(200)
   expect(saved.body.data.progress).toEqual(result.body.data.progress)
+  const dashboard = (await manager.client.get(api + path + '/dashboard').expect(200)).body.data
+  expect(dashboard.sprintProgress.find(({ id }: { id: string }) => id === original.id).progress).toEqual(saved.body.data.progress)
+  expect(dashboard.sprintProgress.find(({ id }: { id: string }) => id === target.id).progress).toMatchObject({ totalTasks: 2, completedTasks: 0 })
 }, 100_000)
+
+it('combines sprint, dependency and existing filters before pagination and matches live dashboard totals', async () => {
+  const path = await project('Filtered dashboard')
+  const selected = await sprint(path, 'Release sprint')
+  const foreign = await sprint(await project('Foreign filter project'), 'Foreign sprint')
+  await (await write(manager.client, 'post', path + '/members', { userId: developer.id })).call.expect(201)
+  const createReleaseTask = async (title: string) => {
+    const response = await (await write(manager.client, 'post', path + '/tasks', {
+      title, priority: 'HIGH', status: 'TODO', assigneeId: developer.id,
+    })).call.expect(201)
+    return response.body.data.id as string
+  }
+  const prerequisite = await task(path, 'Staging environment')
+  const first = await createReleaseTask('Release frontend')
+  const second = await createReleaseTask('Release backend')
+  const ready = await createReleaseTask('Release database')
+  for (const id of [first, second, ready]) await add(selected.path, id)
+  for (const id of [first, second]) {
+    await (await write(manager.client, 'post', `/tasks/${id}/dependencies/${prerequisite.id}`)).call.expect(201)
+  }
+  await (await write(manager.client, 'post', selected.path + '/start')).call.expect(200)
+  const list = api + path + '/tasks'
+  const filters = { sprintId: selected.id, status: 'TODO', priority: 'HIGH', assigneeId: developer.id, search: 'release' }
+  const read = async (query: object) => (await developer.client.get(list).query(query).expect(200)).body
+  const page = await read({ ...filters, blocked: 'true', limit: 1 })
+  const next = await read({ ...filters, blocked: 'true', limit: 1, page: 2 })
+  expect(page.pagination).toMatchObject({ total: 2, totalPages: 2 })
+  expect([page.data[0].id, next.data[0].id]).toEqual([second, first])
+  expect((await read({ ...filters, blocked: 'false' })).data.map(({ id }: { id: string }) => id)).toEqual([ready])
+  expect((await read({ sprintId: 'none', blocked: 'false' })).data[0].id).toBe(prerequisite.id)
+  await developer.client.get(list).query({ blocked: 'yes' }).expect(400)
+  await developer.client.get(list).query({ sprintId: foreign.id, blocked: 'true' }).expect(404)
+  await outsider.client.get(list).query(filters).expect(404)
+
+  await (await write(manager.client, 'patch', prerequisite.path + '/status', { status: 'DONE' })).call.expect(200)
+  expect((await read({ ...filters, blocked: 'true' })).pagination.total).toBe(0)
+  expect((await read({ ...filters, blocked: 'false' })).pagination.total).toBe(3)
+  const progress = (await developer.client.get(api + selected.path).expect(200)).body.data.progress
+  const dashboard = (await developer.client.get(api + path + '/dashboard').expect(200)).body.data
+  expect(dashboard.priorityCounts).toEqual({ LOW: 0, MEDIUM: 1, HIGH: 3, URGENT: 0 })
+  expect(dashboard.priorityCounts.HIGH).toBe((await read({ priority: 'HIGH' })).pagination.total)
+  expect(dashboard.sprintProgress[0]).toMatchObject({ id: selected.id, progress })
+  expect(progress.totalTasks).toBe((await read({ sprintId: selected.id })).pagination.total)
+  await outsider.client.get(api + path + '/dashboard').expect(404)
+}, 90_000)
 
 it('removes membership and serializes backlog rollover with competing task status changes', async () => {
   const path = await project('Backlog rollover')

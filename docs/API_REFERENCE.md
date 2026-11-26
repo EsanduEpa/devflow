@@ -57,16 +57,18 @@ Workspace fields are `id`, `name`, `description`, `ownerId`, `myRole`, `createdA
 | `GET /projects/:id/members` | Project access | — | `200` Array of `{ user: { id, name }, workspaceRole, joinedAt }` | `404 NOT_FOUND` |
 | `POST /projects/:id/members` | Workspace Owner or assigned Project Manager | `userId` of a workspace member | `201` `{ id, projectId, userId, joinedAt }` | `400` for an ineligible member, `403 FORBIDDEN`, `404 NOT_FOUND`, `409 MEMBERSHIP_ALREADY_EXISTS` |
 | `DELETE /projects/:id/members/:userId` | Workspace Owner or assigned Project Manager | — | `204`, unassigns this member’s tasks in the project | `403 FORBIDDEN`, `404 NOT_FOUND`, `409 MANAGER_REPLACEMENT_REQUIRED` |
-| `GET /projects/:id/dashboard` | Project access | — | `200` `{ projectId, totalTasks, completedTasks, inProgressTasks, overdueTasks, completionPercentage }` | `404 NOT_FOUND` |
+| `GET /projects/:id/dashboard` | Project access | — | `200` `{ projectId, totalTasks, completedTasks, inProgressTasks, overdueTasks, completionPercentage, priorityCounts, sprintProgress }` | `404 NOT_FOUND` |
 
 Project fields are `id`, `workspaceId`, `name`, `description`, `managerId`, `status`, `startDate`, `targetDate`, `createdAt`, and `updatedAt`. Names are 3–150 characters and descriptions are at most 2,000. Dates are optional and nullable. If both are present, `targetDate` must be on or after `startDate`. Statuses are `PLANNED`, `ACTIVE`, `COMPLETED`, and `ARCHIVED`. New projects default to `PLANNED`. Listings default to unarchived projects. Project access requires current workspace membership plus workspace ownership, assigned management, or project membership. Dashboard overdue counts use UTC calendar days and unfinished tasks. Completion is rounded to two decimal places and is zero for an empty project.
+
+`priorityCounts` includes `LOW`, `MEDIUM`, `HIGH` and `URGENT`, counting every current task in the project once, including Done and unscheduled tasks. `sprintProgress` includes up to five sprint summaries in the same shape as sprint detail. The active sprint appears first, followed by the most recent sprints by planned start date and ID. Planned and active progress follows current task membership and status. Completed progress uses the saved snapshot from completion, so subsequent rollovers, reopenings and deletions do not change it.
 
 ## Tasks
 
 | Endpoint | Access | Input | Success | Specific errors |
 | --- | --- | --- | --- | --- |
 | `POST /projects/:id/tasks` | Project access | Required `title`. Optional `description`. Owners and assigned Managers may also set `assigneeId`, `priority`, `status`, `dueDate` | `201` Task | `400` for an ineligible assignee, `403 FORBIDDEN` for management fields without permission, `404 NOT_FOUND`, `409 INVALID_STATE` on archived projects |
-| `GET /projects/:id/tasks` | Project access | Optional `status`, `priority`, `assigneeId`, `search`, `sprintId`, `unfinished`, `page`, `limit` | `200` Paginated task array | `404 NOT_FOUND` |
+| `GET /projects/:id/tasks` | Project access | Optional `status`, `priority`, `assigneeId`, `search`, `sprintId`, `blocked`, `unfinished`, `page`, `limit` | `200` Paginated task array | `400 VALIDATION_ERROR`, `404 NOT_FOUND` |
 | `GET /tasks/:id` | Project access | — | `200` Task | `404 NOT_FOUND` |
 | `PATCH /tasks/:id` | Workspace Owner or assigned Project Manager | At least one of `title`, `description`, `assigneeId`, `priority`, `dueDate`. Optional `expectedVersion` | `200` Updated task | `400` for an ineligible assignee, `403 FORBIDDEN`, `404 NOT_FOUND`, `409 INVALID_STATE` on archived projects, `409 STALE_VERSION` |
 | `PATCH /tasks/:id/status` | Workspace Owner, assigned Project Manager, or assigned Developer within the status rules | `status`, optional `expectedVersion` | `200` Updated task | `403 FORBIDDEN` for disallowed transitions or unassigned Developers, `404 NOT_FOUND`, `409 INVALID_STATE` on archived projects, `409 STALE_VERSION` |
@@ -77,6 +79,8 @@ Task fields are `id`, `projectId`, `version`, `sprintId`, `title`, `description`
 Project and task lists default to page `1` and limit `20`, with a maximum limit of `100`. Lists sort newest first by `createdAt` and ID. Task filters combine within a single authorized project. `assigneeId` accepts a full user ID or `unassigned`. `search` allows up to 200 characters and matches a full task ID or words in the title.
 
 `sprintId` on the task list accepts a sprint in the project or `none` for unscheduled tasks. A sprint ID outside the current project returns `404 NOT_FOUND`. Set `unfinished=true` with a specific sprint ID to exclude Done tasks before pagination. `unfinished` and `status` are mutually exclusive.
+
+`blocked=true` keeps tasks with at least one direct prerequisite in the project whose status is outside `DONE`. `blocked=false` keeps tasks with no such prerequisite, including tasks with no prerequisites. Omitting `blocked` returns both. All filters apply before pagination to both rows and totals. The task list stores applied filters in the URL and resets to page one when filters are applied or cleared.
 
 ### Task write conflicts
 

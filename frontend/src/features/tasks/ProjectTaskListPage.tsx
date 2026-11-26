@@ -45,7 +45,7 @@ function TaskList({ project, userId }: { project: Project; userId: string }) {
   return (
     <>
       <section className={panelClass} aria-label="Task filters">
-        <TaskFilters key={query} filters={params} members={members.data ?? []} apply={setParams} paginated />
+        <TaskFilters key={query} filters={params} members={members.data ?? []} apply={setParams} list={{ projectId: project.id, userId }} />
         {members.isError && (
           <div className="mt-3 text-sm">
             <p className={errorClass} role="alert">Could not load project members. {apiErrorMessage(members.error)}</p>

@@ -23,6 +23,7 @@ export const taskListSchema = details.extend({
   query: z.strictObject({
     ...paginationFields,
     sprintId: z.union([id, z.literal('none')]).optional(),
+    blocked: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
     unfinished: z.literal('true').optional(),
     status: z.enum(taskStatuses).optional(),
     priority: z.enum(taskPriorities).optional(),

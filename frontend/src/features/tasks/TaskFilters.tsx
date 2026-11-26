@@ -6,14 +6,15 @@ import type { ProjectMember } from '../projects/api'
 import type { TaskPriority, TaskStatus } from './api'
 import { taskFilterKeys } from './task-navigation'
 import { taskPriorityLabels, taskStatusLabels, taskStatusOrder } from './task-labels'
+import { SprintFilter } from './SprintFilter'
 
 const pageSizes = ['10', '20', '50', '100']
 
-export function TaskFilters({ filters, members, apply, paginated = false }: {
+export function TaskFilters({ filters, members, apply, list }: {
   filters: URLSearchParams
   members: ProjectMember[]
   apply: (params: URLSearchParams) => void
-  paginated?: boolean
+  list?: { projectId: string; userId: string }
 }) {
   const [assignee, setAssignee] = useState(filters.get('assigneeId')?.toLowerCase() ?? '')
   const limit = filters.get('limit') ?? '20'
@@ -22,12 +23,12 @@ export function TaskFilters({ filters, members, apply, paginated = false }: {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
     const params = new URLSearchParams()
-    for (const key of taskFilterKeys) {
+    for (const key of list ? [...taskFilterKeys, 'sprintId', 'blocked'] : taskFilterKeys) {
       const value = String(form.get(key) ?? '').trim()
       if (value) params.set(key, value)
     }
     const perPage = form.get('limit')
-    if (paginated && typeof perPage === 'string' && perPage !== '20') params.set('limit', perPage)
+    if (list && typeof perPage === 'string' && perPage !== '20') params.set('limit', perPage)
     apply(params)
   }
 
@@ -35,13 +36,15 @@ export function TaskFilters({ filters, members, apply, paginated = false }: {
   const status = filters.get('status') as TaskStatus | null
   const priority = filters.get('priority') as TaskPriority | null
   const assigned = filters.get('assigneeId')?.toLowerCase()
+  const blocked = list ? filters.get('blocked') : null
   const active = [search && `Search: ${search}`, status && taskStatusLabels[status], priority && taskPriorityLabels[priority],
-    assigned && (assigned === 'unassigned' ? 'Unassigned' : members.find(({ user }) => user.id === assigned)?.user.name ?? 'Selected assignee')]
+    assigned && (assigned === 'unassigned' ? 'Unassigned' : members.find(({ user }) => user.id === assigned)?.user.name ?? 'Selected assignee'),
+    blocked === 'true' && 'Blocked', blocked === 'false' && 'Not blocked']
     .filter(Boolean)
 
   return (
     <form className="space-y-3" onSubmit={submit}>
-      <div className={`grid gap-3 sm:grid-cols-2 ${paginated ? 'xl:grid-cols-[minmax(12rem,1.6fr)_repeat(4,minmax(7rem,1fr))]' : 'xl:grid-cols-[minmax(12rem,1.6fr)_repeat(3,minmax(8rem,1fr))]'}`}>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,1.6fr)_repeat(3,minmax(8rem,1fr))]">
         <label className="block min-w-0 text-sm font-medium">
           Search task titles or ID
           <span className="relative block">
@@ -73,13 +76,23 @@ export function TaskFilters({ filters, members, apply, paginated = false }: {
             {members.map(({ user }) => <option key={user.id} value={user.id}>{user.name}</option>)}
           </select>
         </label>
-        {paginated && <label className="block min-w-0 text-sm font-medium">
-          Tasks per page
-          <select name="limit" className={fieldClass} defaultValue={limit}>
-            {!pageSizes.includes(limit) && /^\d+$/.test(limit) && Number(limit) >= 1 && Number(limit) <= 100 && <option value={limit}>{limit}</option>}
-            {pageSizes.map((size) => <option key={size} value={size}>{size}</option>)}
-          </select>
-        </label>}
+        {list && <>
+          <SprintFilter {...list} selected={filters.get('sprintId')?.toLowerCase() ?? ''} />
+          <label className="block min-w-0 text-sm font-medium">Dependency status
+            <select name="blocked" className={fieldClass} defaultValue={blocked ?? ''}>
+              <option value="">Any dependency status</option>
+              <option value="true">Blocked</option>
+              <option value="false">Not blocked</option>
+            </select>
+          </label>
+          <label className="block min-w-0 text-sm font-medium">
+            Tasks per page
+            <select name="limit" className={fieldClass} defaultValue={limit}>
+              {!pageSizes.includes(limit) && /^\d+$/.test(limit) && Number(limit) >= 1 && Number(limit) <= 100 && <option value={limit}>{limit}</option>}
+              {pageSizes.map((size) => <option key={size} value={size}>{size}</option>)}
+            </select>
+          </label>
+        </>}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <button className="ui-button ui-secondary"><ListFilter size={16} aria-hidden="true" />Apply filters</button>

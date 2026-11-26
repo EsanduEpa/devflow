@@ -1,17 +1,22 @@
 import { Types, type ClientSession, type PipelineStage, type QueryFilter } from 'mongoose'
 import type { ActivityChange } from '../activity/activity.model.js'
 import type { ActivityRepository } from '../activity/activity.repository.js'
+import { resolvedPrerequisiteStatus, type dependencyModel } from '../dependencies/dependency.model.js'
 import { dateAtUtcMidnight } from '../../shared/date-only.js'
 import { objectId } from '../../shared/object-id.js'
 import type { projectModel } from '../projects/project.model.js'
 import type { TaskRecord, TaskStatus, taskModel } from './task.model.js'
 import type { TaskCreateInput, TaskListInput, TaskUpdateFields } from './task.schemas.js'
 
-export function taskListPipeline(projectId: string, { page, limit, status, priority, assigneeId, search, sprintId, unfinished }: TaskListInput['query']): PipelineStage[] {
+export function taskListPipeline(
+  projectId: string, { page, limit, status, priority, assigneeId, search, sprintId, unfinished, blocked }: TaskListInput['query'],
+  collections: { tasks: string; dependencies: string },
+): PipelineStage[] {
+  const project = new Types.ObjectId(projectId)
   const exactId = search && objectId.safeParse(search).success ? new Types.ObjectId(search) : undefined
   const words = !exactId && search ? search.match(/[\p{L}\p{M}\p{N}]+/gu)?.join(' ') : undefined
   const match = {
-    projectId: new Types.ObjectId(projectId),
+    projectId: project,
     ...(status && { status }),
     ...(unfinished && { status: { $ne: 'DONE' } }),
     ...(sprintId && { sprintId: sprintId === 'none' ? null : new Types.ObjectId(sprintId) }),
@@ -21,14 +26,27 @@ export function taskListPipeline(projectId: string, { page, limit, status, prior
     ...(words && { $text: { $search: words } }),
     ...(search && !exactId && !words && { _id: { $in: [] } }),
   }
-  return [
-    { $match: match },
-    { $sort: { createdAt: -1, _id: -1 } },
-    { $facet: {
-      items: [{ $skip: (page - 1) * limit }, { $limit: limit }],
-      count: [{ $count: 'total' }],
-    } },
-  ]
+  const pipeline: PipelineStage[] = [{ $match: match }, { $sort: { createdAt: -1, _id: -1 } }]
+  if (blocked !== undefined) {
+    pipeline.push({ $lookup: {
+      from: collections.dependencies, localField: '_id', foreignField: 'taskId', as: 'unresolvedEdges',
+      pipeline: [
+        { $match: { projectId: project } },
+        { $lookup: {
+          from: collections.tasks, localField: 'prerequisiteId', foreignField: '_id', as: 'prerequisite',
+          pipeline: [{ $match: { projectId: project, status: { $ne: resolvedPrerequisiteStatus } } }, { $project: { _id: 1 } }],
+        } },
+        { $match: { 'prerequisite.0': { $exists: true } } },
+        { $limit: 1 },
+        { $project: { _id: 1 } },
+      ],
+    } }, { $match: { 'unresolvedEdges.0': { $exists: blocked } } }, { $unset: 'unresolvedEdges' })
+  }
+  pipeline.push({ $facet: {
+    items: [{ $skip: (page - 1) * limit }, { $limit: limit }],
+    count: [{ $count: 'total' }],
+  } })
+  return pipeline
 }
 
 function versionFilter(expectedVersion?: number): QueryFilter<TaskRecord> {
@@ -39,7 +57,9 @@ function versionFilter(expectedVersion?: number): QueryFilter<TaskRecord> {
 
 export function taskRepository(
   tasks: ReturnType<typeof taskModel>, projects: ReturnType<typeof projectModel>, activity: Pick<ActivityRepository, 'append'>,
+  dependencies: ReturnType<typeof dependencyModel>,
 ) {
+  const collections = { tasks: tasks.collection.name, dependencies: dependencies.collection.name }
   async function updateManyWithActivity(
     filter: QueryFilter<TaskRecord>, change: ActivityChange, actorId: string, session: ClientSession,
   ) {
@@ -70,7 +90,7 @@ export function taskRepository(
     },
 
     async list(projectId: string, query: TaskListInput['query']) {
-      const [result] = await tasks.aggregate<{ items: TaskRecord[]; count: { total: number }[] }>(taskListPipeline(projectId, query)).exec()
+      const [result] = await tasks.aggregate<{ items: TaskRecord[]; count: { total: number }[] }>(taskListPipeline(projectId, query, collections)).exec()
       return { items: result?.items ?? [], total: result?.count[0]?.total ?? 0 }
     },
 
