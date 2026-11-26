@@ -6,10 +6,14 @@ const api = '/api/v1'
 const password = 'DevFlowNotificationBrowserPassword!'
 
 function bell(page: Page, count: number) {
-  return page.getByRole('link', { name: count ? `Notifications, ${count} unread` : 'Notifications', exact: true })
+  return page.getByRole('button', { name: count ? `Notifications, ${count} unread` : 'Notifications', exact: true })
 }
 
-test('refreshes the inbox across sessions, reconnects, persists read state and hides revoked links', async ({ browser, page }) => {
+function inbox(page: Page) {
+  return page.getByRole('dialog', { name: 'Notifications', exact: true })
+}
+
+test('opens the inbox over the current page, refreshes across sessions and hides revoked links', async ({ browser, page }) => {
   test.setTimeout(120_000)
   const fixture = await startStage1App('browser')
   const phone = await browser.newContext({ viewport: { width: 390, height: 844 } })
@@ -56,8 +60,20 @@ test('refreshes the inbox across sessions, reconnects, persists read state and h
     await write(page.request, taskPath, 200, 'PATCH', { assigneeId: developerId })
     await expect(bell(dev, 1)).toBeVisible()
 
+    await bell(dev, 1).focus()
+    await dev.keyboard.press('Enter')
+    await expect(inbox(dev).getByRole('heading', { name: 'Notifications', exact: true })).toBeFocused()
+    await expect(bell(dev, 1)).toHaveAttribute('aria-expanded', 'true')
+    await expect(dev).toHaveURL(fixture.origin + '/workspaces')
+    await expect(dev.getByRole('main')).toBeVisible()
+    const bounds = await inbox(dev).boundingBox()
+    expect(bounds!.x).toBeGreaterThanOrEqual(0)
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390)
+    await dev.keyboard.press('Escape')
+    await expect(inbox(dev)).toBeHidden()
+    await expect(bell(dev, 1)).toBeFocused()
     await bell(dev, 1).click()
-    await expect(dev.getByRole('heading', { name: 'Task assigned to you' })).toBeVisible()
+    await expect(inbox(dev).getByRole('heading', { name: 'Task assigned to you' })).toBeVisible()
     await write(page.request, taskPath + '/comments', 201, 'POST', { body: 'An inbox mention', mentionUserIds: [developerId] })
     await expect(bell(dev, 2)).toBeVisible()
     await expect(dev.getByRole('heading', { name: 'You were mentioned' })).toBeVisible()
@@ -71,22 +87,29 @@ test('refreshes the inbox across sessions, reconnects, persists read state and h
     await expect.poll(() => connections().some(({ id }) => id !== firstSocket.id)).toBe(true)
     await expect(bell(dev, 3)).toBeVisible()
 
-    await other.goto(fixture.origin + '/notifications')
-    await expect(bell(other, 3)).toBeVisible()
+    await other.goto(fixture.origin + '/workspaces')
+    await bell(other, 3).click()
     await expect.poll(() => connections().length).toBe(2)
     const assignment = dev.getByRole('listitem').filter({ has: dev.getByRole('heading', { name: 'Task assigned to you' }) })
     await assignment.getByRole('button', { name: 'Mark as read' }).click()
     await expect(bell(dev, 2)).toBeVisible()
     await expect(bell(other, 2)).toBeVisible()
     await other.reload()
-    await expect(bell(other, 2)).toBeVisible()
+    await bell(other, 2).click()
+    await expect(inbox(other).getByRole('heading', { name: 'Task assigned to you' })).toBeVisible()
 
-    await page.goto(fixture.origin + '/notifications')
-    await expect(bell(page, 0)).toBeVisible()
+    await page.goto(fixture.origin + '/workspaces')
+    await bell(page, 0).click()
+    await expect(inbox(page)).toBeVisible()
+    await page.getByRole('main').click({ position: { x: 8, y: 8 } })
+    await expect(inbox(page)).toBeHidden()
+    await bell(page, 0).click()
     await assignment.getByRole('link', { name: task.title }).click()
+    await expect(dev).toHaveURL(fixture.origin + taskPath)
+    await expect(inbox(dev)).toBeHidden()
     await expect(dev.getByRole('heading', { name: task.title })).toBeVisible()
     await dev.getByLabel('Change status for ' + task.title).selectOption('IN_REVIEW')
-    await expect(page.getByRole('heading', { name: 'Task ready for review' })).toBeVisible()
+    await expect(inbox(page).getByRole('heading', { name: 'Task ready for review' })).toBeVisible()
     await expect(bell(page, 1)).toBeVisible()
 
     await write(page.request, projectPath + '/members/' + developerId, 204, 'DELETE')

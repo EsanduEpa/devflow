@@ -1,6 +1,6 @@
 # M24 in-app notifications
 
-The Studio header includes an inbox link and unread count. Recipients can mark individual items as read. The inbox rechecks task access and invitation availability before returning link details.
+The Studio header bell shows the unread count and opens the inbox over the current page. Recipients can mark individual items as read. The inbox rechecks task access and invitation availability before returning link details.
 
 ## Triggers and deduplication
 
@@ -37,3 +37,5 @@ Checks used Node.js 24, isolated collections in the configured Atlas test databa
 | `npm --prefix backend run test:e2e -- --workers=3` | 12 passed |
 
 The database tests verified all five triggers, duplicate suppression during overlapping deadline scans, rollback with the source transaction, recipient-scoped reads and updates, and invitation token privacy. A final run of the invitation and notification suites passed all nine tests, including the private socket signal check. The browser walkthrough verified badge refresh outside a project room, cross-session read state, reconnect recovery, review delivery and redaction after access removal.
+
+The focused Chromium scenario also verifies that the popover leaves the URL unchanged, fits a 390-pixel viewport, restores focus to the bell after Escape, closes on an outside click, and closes when a task link opens.
