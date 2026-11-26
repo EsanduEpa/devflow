@@ -62,7 +62,7 @@ export async function startStage1App(purpose: 'notifications' | 'browser' | 'per
     const connection = await connectDatabase(uri, 'devflow_test')
     const config = authConfig({ APP_ORIGINS: origin, CSRF_SECRET: randomBytes(32).toString('hex') })
     const email = { origin, async sendResetEmail() { throw new Error('Stage 1 browser and timing checks do not deliver email.') } }
-    if (purpose === 'browser' || purpose === 'notifications' || purpose === 'realtime') {
+    if (purpose === 'browser' || purpose === 'notifications' || purpose === 'realtime' || purpose === 'performance') {
       live = createRealtime(config, purpose === 'realtime' ? 500 : undefined)
     }
     let deadlineScan: DeadlineScan | undefined

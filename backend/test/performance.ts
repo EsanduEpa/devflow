@@ -1,5 +1,6 @@
 import { Types, type PipelineStage } from 'mongoose'
 import request from 'supertest'
+import { io, type Socket } from 'socket.io-client'
 import { dashboardTaskPipeline } from '../src/modules/dashboard/dashboard.repository.js'
 import { taskPriorities } from '../src/modules/tasks/task.model.js'
 import { taskListPipeline } from '../src/modules/tasks/task.repository.js'
@@ -18,6 +19,22 @@ function winningIndexes(plan: unknown): string[] {
   }
   visit(plan)
   return [...indexes]
+}
+
+function nextSignal(socket: Socket, event: string, matches: (payload: unknown) => boolean = () => true) {
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      socket.off(event, receive)
+      reject(new Error(`Timed out waiting for ${event}.`))
+    }, 15_000)
+    function receive(payload: unknown) {
+      if (!matches(payload)) return
+      clearTimeout(timer)
+      socket.off(event, receive)
+      resolve()
+    }
+    socket.on(event, receive)
+  })
 }
 
 try {
@@ -92,8 +109,8 @@ try {
       return client.patch(`${taskPath}/status`).set('Origin', app.origin).set('X-CSRF-Token', token).send({ status }).expect(200)
     },
   }
-  const timings = []
-  for (const [operation, run] of Object.entries(operations)) {
+  const timings: { operation: string; medianMs: number; p95Ms: number; maxMs: number }[] = []
+  async function measure(operation: string, run: () => PromiseLike<unknown>) {
     for (let index = 0; index < warmups; index++) await run()
     const elapsed = []
     for (let index = 0; index < samples; index++) {
@@ -109,6 +126,55 @@ try {
       p95Ms: Math.round(elapsed[Math.ceil(samples * 0.95) - 1]),
       maxMs: Math.round(elapsed[samples - 1]),
     })
+  }
+  for (const [operation, run] of Object.entries(operations)) await measure(operation, run)
+
+  const observer = request.agent(app.origin)
+  const viewerCredentials = { email: 'observer@example.test', password: credentials.password }
+  async function observerPost(path: string, data: object, status: number) {
+    const { body } = await observer.get(`${auth}/csrf`).expect(200)
+    return observer.post(path).set('Origin', app.origin).set('X-CSRF-Token', body.data.csrfToken).send(data).expect(status)
+  }
+  const { body: { data: { id: observerId } } } = await observerPost(`${auth}/register`, { name: 'Benchmark Developer', ...viewerCredentials }, 201)
+  const login = await observerPost(`${auth}/login`, viewerCredentials, 200)
+  const sessionCookies = login.headers['set-cookie'] as unknown as string[]
+  const session = sessionCookies.find((cookie) => cookie.startsWith('devflow_session='))?.split(';', 1)[0]
+  if (!session) throw new Error('Expected a benchmark observer session.')
+  await app.database.collection(app.collections.workspace.members).insertOne({
+    workspaceId, userId: new Types.ObjectId(observerId), role: 'DEVELOPER', joinedAt: baseDate,
+  })
+  await post(`${projectPath}/members`, { userId: observerId })
+  const socket = io(app.origin, {
+    transports: ['websocket'], reconnection: false,
+    extraHeaders: { Origin: app.origin, Cookie: session },
+  })
+  try {
+    const subscription = await socket.timeout(10_000).emitWithAck('project:subscribe', { projectId: projectId.toString() })
+    if (subscription.data?.projectId !== projectId.toString()) throw new Error('Could not subscribe the benchmark observer.')
+    await measure('Move task, receive project signal, refresh task list', async () => {
+      const status = nextStatus
+      await Promise.all([
+        nextSignal(socket, 'project:changed', (event) => !!event && typeof event === 'object'
+          && 'taskId' in event && event.taskId === rows[333]._id.toString() && 'kind' in event && event.kind === 'task.changed'),
+        operations['Change task status'](),
+      ])
+      const { body } = await observer.get(`${tasksPath}?search=${rows[333]._id}&status=${status}`).expect(200)
+      if (body.data[0]?.status !== status) throw new Error('The observer did not read the committed move.')
+    })
+    await measure('Post mention, receive private signal, refresh inbox', async () => {
+      await Promise.all([
+        nextSignal(socket, 'notifications:changed'),
+        client.post(`${taskPath}/comments`).set('Origin', app.origin).set('X-CSRF-Token', token)
+          .send({ body: 'Benchmark collaboration mention', mentionUserIds: [observerId] }).expect(201),
+      ])
+      const { body } = await observer.get(`${api}/notifications?limit=1`).expect(200)
+      const notification = body.data[0]
+      if (notification?.kind !== 'MENTION' || notification.task?.id !== rows[333]._id.toString()) {
+        throw new Error('The observer did not read the committed mention.')
+      }
+    })
+  } finally {
+    socket.disconnect()
   }
 
   const plans: Awaited<ReturnType<typeof taskPlan>>[] = []

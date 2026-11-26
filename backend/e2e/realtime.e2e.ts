@@ -86,14 +86,33 @@ test('syncs assignment, board movements and comments, catches up after reconnect
     await expect(comments.getByText('Saved while disconnected', { exact: true })).toBeVisible()
     await expect(drawer.getByLabel('Change status for ' + task.title)).toHaveValue('IN_REVIEW')
 
+    // Deliver the revocation after a REST refetch has already observed the removal.
+    const reconnected = [...fixture.realtimeServer!.sockets.sockets.values()]
+      .find((socket) => socket.data.userId === developerId)!
+    const emit = reconnected.emit
+    let deliverRevocation: (() => void) | undefined
+    reconnected.emit = (event, ...args) => {
+      const send = () => Reflect.apply(emit, reconnected, [event, ...args]) as boolean
+      if (event !== 'project:access-revoked') return send()
+      deliverRevocation = () => { reconnected.emit = emit; send() }
+      return true
+    }
+    await viewer.bringToFront()
     await write(page.request, projectPath + '/members/' + developerId, 204, 'DELETE')
-    await expect(viewer.getByRole('alert')).toHaveText('You no longer have access to this project.')
+    await expect.poll(() => deliverRevocation).toBeTruthy()
+    const projectDenied = viewer.waitForResponse((response) => response.url() === fixture.origin + api + projectPath && response.status() === 404)
+    await viewer.evaluate(() => window.dispatchEvent(new Event('visibilitychange')))
+    await projectDenied
+    await expect(drawer.getByText('You don’t have access to this task.', { exact: true })).toBeVisible()
+    deliverRevocation!()
+    const denied = viewer.getByRole('alert').filter({ hasText: 'You no longer have access to this project.' })
+    await expect(denied).toBeVisible()
     await expect(drawer).toHaveCount(0)
     await expect(board).toHaveCount(0)
     const afterRevocation = signals.length
     await write(page.request, taskPath + '/status', 200, 'PATCH', { status: 'DONE' })
     expect(signals).toHaveLength(afterRevocation)
-    await expect(viewer.getByRole('alert')).toHaveText('You no longer have access to this project.')
+    await expect(denied).toBeVisible()
   } finally {
     await teammate.close()
     await fixture.close()
