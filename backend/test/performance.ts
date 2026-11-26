@@ -1,5 +1,7 @@
-import { Types } from 'mongoose'
+import { Types, type PipelineStage } from 'mongoose'
 import request from 'supertest'
+import { dashboardTaskPipeline } from '../src/modules/dashboard/dashboard.repository.js'
+import { taskPriorities } from '../src/modules/tasks/task.model.js'
 import { taskListPipeline } from '../src/modules/tasks/task.repository.js'
 import { startStage1App } from './fixtures/stage1-app.js'
 
@@ -47,6 +49,10 @@ try {
   })))
 
   const tasks = app.database.collection(app.collections.task.tasks)
+  const sprintId = new Types.ObjectId()
+  const sprints = app.database.collection(app.collections.sprint.sprints)
+  await sprints.insertOne({ _id: sprintId, projectId, name: 'Measured sprint', status: 'ACTIVE', startDate: baseDate, endDate: baseDate,
+    createdAt: baseDate, updatedAt: baseDate })
   const rows = projectIds.flatMap((id, projectIndex) =>
     Array.from({ length: projectIndex === 0 ? 800 : 400 }, (_, index) => ({
       _id: new Types.ObjectId(), projectId: id, createdBy: ownerId,
@@ -54,10 +60,17 @@ try {
       status: index % 16 === 0 ? 'DONE' : 'TODO',
       priority: index % 11 === 0 ? 'URGENT' : 'MEDIUM',
       assigneeId: index % 7 === 0 ? ownerId : null,
+      sprintId: projectIndex === 0 && index % 3 === 0 ? sprintId : null,
       dueDate: new Date(baseDate.getTime() + index % 90 * 86_400_000),
       createdAt: new Date(baseDate.getTime() + index), updatedAt: baseDate,
     })))
   await tasks.insertMany(rows)
+  const edges = rows.flatMap((row, index) => index % 4 === 0 ? [{
+    projectId: row.projectId, taskId: row._id, prerequisiteId: rows[index + 1]._id,
+  }] : [])
+  const dependencies = app.database.collection(app.collections.dependency.dependencies)
+  await dependencies.insertMany(edges)
+  const collections = { tasks: tasks.collectionName, dependencies: dependencies.collectionName }
 
   const projectPath = `${api}/projects/${projectId}`
   const taskPath = `${api}/tasks/${rows[333]._id}`
@@ -71,6 +84,7 @@ try {
     'Load the first task page': () => client.get(tasksPath).expect(200),
     'Filter tasks by Done': () => client.get(`${tasksPath}?status=DONE`).expect(200),
     'Search title and filter priority': () => client.get(`${tasksPath}?search=release&priority=URGENT`).expect(200),
+    'Filter sprint and blocked status': () => client.get(`${tasksPath}?sprintId=${sprintId}&blocked=true&status=TODO`).expect(200),
     'Load dashboard': () => client.get(`${projectPath}/dashboard`).expect(200),
     'Change task status': () => {
       const status = nextStatus
@@ -97,28 +111,47 @@ try {
     })
   }
 
-  const plans = []
+  const plans: Awaited<ReturnType<typeof taskPlan>>[] = []
+  async function taskPlan(operation: string, pipeline: PipelineStage[], hint?: string) {
+    const explanation = await tasks.aggregate(pipeline, { hint }).explain('executionStats')
+    const cursor = explanation.stages?.find((stage: { $cursor?: unknown }) => stage.$cursor)?.$cursor ?? explanation
+    const lookup = explanation.stages?.find((stage: { $lookup?: unknown }) => stage.$lookup)
+    return {
+      operation,
+      indexes: winningIndexes(cursor.queryPlanner.winningPlan),
+      keysExamined: cursor.executionStats.totalKeysExamined,
+      documentsExamined: cursor.executionStats.totalDocsExamined,
+      ...(lookup && { lookup: {
+        indexes: lookup.indexesUsed, keysExamined: lookup.totalKeysExamined,
+        documentsExamined: lookup.totalDocsExamined, collectionScans: lookup.collectionScans,
+      } }),
+    }
+  }
   for (const [operation, filters] of [
     ['Default task page', {}],
     ['Done filter', { status: 'DONE' }],
     ['Assignee filter', { assigneeId: ownerId.toString() }],
     ['Title + priority', { search: 'release', priority: 'URGENT' }],
     ['Exact task ID', { search: rows[333]._id.toString() }],
+    ['Sprint + status, before adding blocked filter', { sprintId: sprintId.toString(), status: 'TODO' }],
+    ['Sprint + status + blocked', { sprintId: sprintId.toString(), status: 'TODO', blocked: true }],
+    ['Blocked only', { blocked: true }],
   ] as const) {
-    const pipeline = taskListPipeline(projectId.toString(), { page: 1, limit: 20, ...filters })
-    const explanation = await tasks.aggregate(pipeline).explain('executionStats')
-    const cursor = explanation.stages?.find((stage: { $cursor?: unknown }) => stage.$cursor)?.$cursor ?? explanation
-    plans.push({
-      operation,
-      indexes: winningIndexes(cursor.queryPlanner.winningPlan),
-      keysExamined: cursor.executionStats.totalKeysExamined,
-      documentsExamined: cursor.executionStats.totalDocsExamined,
-    })
+    const pipeline = taskListPipeline(projectId.toString(), { page: 1, limit: 20, ...filters }, collections)
+    plans.push(await taskPlan(operation, pipeline))
   }
+  const combined = taskListPipeline(projectId.toString(), { page: 1, limit: 20, sprintId: sprintId.toString(), status: 'TODO', blocked: true }, collections)
+  plans.push(await taskPlan('Sprint + status + blocked with general project sort index', combined, 'projectId_1_createdAt_-1__id_-1'))
+  const dashboard = dashboardTaskPipeline(projectId.toString(), baseDate)
+  const [match, group] = dashboard
+  const legacyGroup = { ...group.$group }
+  for (const priority of taskPriorities) Reflect.deleteProperty(legacyGroup, priority)
+  plans.push(await taskPlan('Dashboard totals before priority breakdown', [match, { $group: legacyGroup }, { $project: { _id: 0 } }]))
+  plans.push(await taskPlan('Dashboard totals with priority breakdown', dashboard))
 
   console.log(JSON.stringify({
     node: process.version, platform: process.platform, architecture: process.arch, samples, warmups,
-    projects: projectIds.length, tasks: rows.length, tasksInMeasuredProject: 800, timings, plans,
+    projects: projectIds.length, tasks: rows.length, tasksInMeasuredProject: 800, dependencies: edges.length, timings, plans,
   }, null, 2))
 } finally {
   await app.close()

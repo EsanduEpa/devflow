@@ -132,3 +132,16 @@ npm --prefix backend run test:e2e -- realtime.e2e.ts
 npm --prefix backend run test:e2e -- notifications.e2e.ts
 npm --prefix backend run test:db
 ```
+
+## M25 task filters and project dashboard walkthrough
+
+1. In an editable project, put two High-priority tasks in a sprint. Give one task an unfinished prerequisite. Leave a third task outside the sprint.
+2. Open **Task list**. Select the sprint, **High** priority and **Blocked** under **Dependency status**, then apply the filters. Only the task with an unfinished prerequisite appears. Select **Not blocked** to find the other sprint task, or **No sprint** to find unscheduled tasks.
+3. Add enough matching tasks for another page, move to page two and reopen the copied URL. Verify the page and filters are restored. Apply a different filter and confirm the list returns to page one.
+4. Open **Dashboard** and select the **High** priority count. Compare it with the result total on the filtered task list. Use **View tasks** on the active sprint and compare its count with the sprint detail.
+5. Complete the sprint and roll unfinished work into a future sprint. The new sprint shows the moved work. The completed sprint keeps its progress **at completion**, even if you reopen or delete a task later.
+
+```sh
+npm --prefix backend run test:e2e -- sprints.e2e.ts
+npm --prefix backend run test:performance
+```

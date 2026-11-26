@@ -348,16 +348,18 @@ The current `test:db` script lists its test files explicitly. Add each new datab
 
 **Outcome** Team members can find specific work and see more detailed progress on the project dashboard.
 
+**Evidence** [M25 verification and query plans](engineering-notes/019-m25-filters-dashboard-verification.md) · [Demo](DEMO.md#m25-task-filters-and-project-dashboard-walkthrough)
+
 **Prerequisites** M17 for sprint data and M20 for dependency status.
 
 **Study and understand** Compound filters, index selection, aggregation, and consistent definitions of metrics.
 
 **Steps to complete**
 
-1. [ ] Identify supported filter combinations and the expected URL and pagination behavior. Extend the existing task list with sprint and blocked filters as the proposed additions, keeping status, priority, assignee, and search behavior.
-2. [ ] Add project dashboard breakdowns for priority and sprint progress. Define how moved, completed, and historical tasks contribute to each figure.
-3. [ ] Connect filters and project metrics in the UI using the existing project permissions, loading states, and visual conventions.
-4. [ ] Verify query plans with representative fixtures. Add indexes justified by the new queries and record the before and after observations.
+1. [x] Identify supported filter combinations and the expected URL and pagination behavior. Extend the existing task list with sprint and blocked filters as the proposed additions, keeping status, priority, assignee, and search behavior.
+2. [x] Add project dashboard breakdowns for priority and sprint progress. Define how moved, completed, and historical tasks contribute to each figure.
+3. [x] Connect filters and project metrics in the UI using the existing project permissions, loading states, and visual conventions.
+4. [x] Verify query plans with representative fixtures. Add indexes justified by the new queries and record the before and after observations.
 
 **Verify and test** Combine filters, change pages, and reopen a copied URL. Match priority and sprint figures to a seeded project and compare each relevant count with its filtered task list. Check empty projects and an unauthorized user.
 

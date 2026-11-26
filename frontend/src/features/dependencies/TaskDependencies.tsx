@@ -97,7 +97,10 @@ export function TaskDependencies({ taskId, projectId, userId, editable }: {
   })
   const change = useMutation({
     mutationFn: ({ prerequisiteId, add }: { prerequisiteId: string; add: boolean }) => changeTaskDependency(taskId, prerequisiteId, add),
-    onSuccess: () => client.invalidateQueries({ queryKey: dependencyKeys.project(userId, projectId) }),
+    onSuccess: () => Promise.all([
+      client.invalidateQueries({ queryKey: dependencyKeys.project(userId, projectId) }),
+      client.invalidateQueries({ queryKey: ['tasks', userId, 'list', projectId] }),
+    ]),
     onError: async (error) => {
       if (!(error instanceof ApiError)) return
       if (error.status === 404) {

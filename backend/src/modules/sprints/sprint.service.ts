@@ -53,6 +53,12 @@ export function sprintService(
     return publicSprint(sprint, counts.get(sprint._id.toString()))
   }
 
+  async function renderList(projectId: ProjectRecord['_id'], items: SprintRecord[]) {
+    const live = items.filter(({ status }) => status !== 'COMPLETED').map(({ _id }) => _id)
+    const counts = live.length ? await tasks.sprintCounts(projectId, live) : undefined
+    return items.map((sprint) => publicSprint(sprint, counts?.get(sprint._id.toString())))
+  }
+
   async function changeMembership(userId: string, id: string, taskId: string, add: boolean, expectedVersion?: number) {
     return manage(userId, id, async (sprint, session) => {
       if (sprint.status === 'COMPLETED') throw invalidState('Completed sprint membership cannot be changed.')
@@ -82,12 +88,17 @@ export function sprintService(
     async list(userId: string, projectId: string, query: PageRequest) {
       const { project } = await projects.requireAccess(userId, projectId)
       const { items, total } = await repository.list(projectId, query)
-      const live = items.filter(({ status }) => status !== 'COMPLETED').map(({ _id }) => _id)
-      const counts = live.length ? await tasks.sprintCounts(project._id, live) : new Map<string, never>()
       return {
-        data: items.map((sprint) => publicSprint(sprint, counts.get(sprint._id.toString()))),
+        data: await renderList(project._id, items),
         pagination: { ...query, total, totalPages: Math.ceil(total / query.limit) },
       }
+    },
+
+    async dashboardProgress(project: ProjectRecord) {
+      const id = project._id.toString()
+      const [items, active] = await Promise.all([repository.pageItems(id, { page: 1, limit: 5 }), repository.active(id)])
+      const recent = active ? [active, ...items.filter(({ _id }) => !_id.equals(active._id))].slice(0, 5) : items
+      return renderList(project._id, recent)
     },
 
     async details(userId: string, id: string) {
