@@ -20,6 +20,7 @@ import { dependencyService } from './modules/dependencies/dependency.service.js'
 import { projectMemberModel } from './modules/projects/project-member.model.js'
 import { projectModel } from './modules/projects/project.model.js'
 import { createProjectRoutes, type ProjectCollections } from './modules/projects/project.routes.js'
+import type { Realtime } from './modules/realtime/realtime.js'
 import { sprintModel } from './modules/sprints/sprint.model.js'
 import { sprintRepository } from './modules/sprints/sprint.repository.js'
 import { createSprintRoutes } from './modules/sprints/sprint.routes.js'
@@ -44,8 +45,9 @@ export async function createApi(
     activity: { activity: string }
     dependency: { dependencies: string }
   },
+  live?: Realtime,
 ) {
-  const auth = await createAuthModule(connection, authConfig, emailConfig, collections?.auth)
+  const auth = await createAuthModule(connection, authConfig, emailConfig, collections?.auth, live)
   const projectModels = {
     projects: projectModel(connection, collections?.project.projects),
     members: projectMemberModel(connection, collections?.project.members),
@@ -63,16 +65,17 @@ export async function createApi(
   const commentStore = commentRepository(comments, auth.users)
   const sprintStore = sprintRepository(sprints)
   const taskStore = taskRepository(tasks, projectModels.projects, activityStore)
-  const workspaces = await createWorkspaceRoutes(connection, auth, projectModels, taskStore, collections?.workspace)
-  const projects = await createProjectRoutes(projectModels, auth, workspaces, taskStore)
+  const workspaces = await createWorkspaceRoutes(connection, auth, projectModels, taskStore, collections?.workspace, live)
+  const projects = await createProjectRoutes(projectModels, auth, workspaces, taskStore, live)
+  live?.bind(auth.service, projects.service)
   const taskOperations = taskService(taskStore, projects.service, workspaces.service, sprintStore, commentStore, activityStore, dependencyStore)
-  const taskRoutes = createTaskRoutes(taskOperations, auth)
-  const commentRoutes = createCommentRoutes(commentService(commentStore, taskOperations, projects.service, workspaces.service), auth)
+  const taskRoutes = createTaskRoutes(taskOperations, auth, live)
+  const commentRoutes = createCommentRoutes(commentService(commentStore, taskOperations, projects.service, workspaces.service, live), auth)
   const dashboardRoutes = createDashboardRoutes(dashboardService(dashboardRepository(tasks), projects.service), auth.requireUser)
   const router = Router()
 
   router.use(auth.router)
-  router.use(createSprintRoutes(sprintService(sprintStore, taskStore, projects.service, workspaces.service, activityStore), auth))
+  router.use(createSprintRoutes(sprintService(sprintStore, taskStore, projects.service, workspaces.service, activityStore), auth, live))
   router.use('/workspaces', workspaces.router)
   router.use('/workspaces', projects.workspaceProjects)
   router.use('/projects', projects.projectDetails)
@@ -80,7 +83,7 @@ export async function createApi(
   router.use('/projects', dashboardRoutes)
   router.use('/tasks', taskRoutes.tasks)
   router.use('/tasks', commentRoutes)
-  router.use('/tasks', createDependencyRoutes(dependencyService(dependencyStore, taskOperations, workspaces.service), auth))
+  router.use('/tasks', createDependencyRoutes(dependencyService(dependencyStore, taskOperations, workspaces.service, live), auth))
   router.use('/tasks', createActivityRoutes(activityStore, taskOperations, auth.requireUser))
   router.use('/invitations', workspaces.invitationRouter)
   return router

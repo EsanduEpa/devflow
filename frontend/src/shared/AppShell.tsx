@@ -1,3 +1,4 @@
+import { useProjectLive } from '../features/realtime/useProjectLive'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, matchPath, useLocation, useNavigate, type Location } from 'react-router'
@@ -85,6 +86,7 @@ export function AppShell({ user, theme, onToggle, current, children }: {
   children: ReactNode
 }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [revoked, setRevoked] = useState<{ projectId: string; path: string } | null>(null)
   const actual = useLocation()
   const navigate = useNavigate()
   const path = current.pathname
@@ -92,15 +94,16 @@ export function AppShell({ user, theme, onToggle, current, children }: {
   const task = useQuery({
     queryKey: taskKey(user.id, taskId),
     queryFn: ({ signal }) => getTask(taskId, signal),
-    enabled: !!taskId, retry: false, gcTime: 0,
+    enabled: !!taskId && revoked?.path !== path, retry: false, gcTime: 0,
   })
   const projectId = (matchPath('/projects/:projectId/*', path)?.params.projectId ?? (task.isSuccess ? task.data.projectId : '')).toLowerCase()
+  const accessLost = revoked?.projectId === projectId || revoked?.path === path
   const projectQuery = useQuery({
     queryKey: projectKeys.details(user.id, projectId),
     queryFn: ({ signal }) => getProject(projectId, signal),
-    enabled: !!projectId, retry: false, gcTime: 0,
+    enabled: !!projectId && !accessLost, retry: false, gcTime: 0,
   })
-  const project = projectQuery.isSuccess ? projectQuery.data : undefined
+  const project = projectQuery.isSuccess && !accessLost ? projectQuery.data : undefined
   const workspaceId = (matchPath('/workspaces/:workspaceId/*', path)?.params.workspaceId ?? project?.workspaceId ?? '').toLowerCase()
   const workspaces = useQuery({
     queryKey: workspaceKeys.list(user.id), queryFn: ({ signal }) => listWorkspaces(signal), retry: false, gcTime: 0,
@@ -109,6 +112,15 @@ export function AppShell({ user, theme, onToggle, current, children }: {
   const workspacePath = workspace ? `/workspaces/${workspace.id}` : undefined
   const projectPath = project ? `/projects/${project.id}` : undefined
   const canManage = workspace?.myRole === 'OWNER' || (workspace?.myRole === 'MANAGER' && project?.managerId === user.id)
+
+  const openTaskId = matchPath('/tasks/:taskId', actual.pathname)?.params.taskId?.toLowerCase()
+  useProjectLive({
+    userId: user.id,
+    projectId: project?.id,
+    workspaceId: project?.workspaceId,
+    taskId: openTaskId,
+    onRevoked: (id) => setRevoked({ projectId: id, path }),
+  })
 
   useEffect(() => {
     const width = matchMedia('(min-width: 1024px)')
@@ -188,7 +200,12 @@ export function AppShell({ user, theme, onToggle, current, children }: {
           </div>
           <AccountMenu key={actual.key} user={user} theme={theme} onToggle={onToggle} />
         </header>
-        <main id="main-content" tabIndex={-1} className="app-content">{children}</main>
+        <main id="main-content" tabIndex={-1} className="app-content">
+          {accessLost ? <section className="ui-panel max-w-xl">
+            <p className={errorClass} role="alert">You no longer have access to this project.</p>
+            <Link to="/workspaces" className="ui-button ui-secondary mt-3" onClick={() => setRevoked(null)}>All workspaces</Link>
+          </section> : children}
+        </main>
       </div>
     </div>
   )

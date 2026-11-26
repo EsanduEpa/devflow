@@ -92,7 +92,7 @@ export default function App() {
   )
 
   if (user && !publicForm) {
-    return <AppShell user={user} theme={theme} onToggle={toggleTheme} current={background ?? location}>{content}</AppShell>
+    return <AppShell key={user.id} user={user} theme={theme} onToggle={toggleTheme} current={background ?? location}>{content}</AppShell>
   }
 
   return (

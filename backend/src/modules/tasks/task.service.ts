@@ -126,6 +126,7 @@ export function taskService(
         await comments.removeForTask(taskId, session)
         await activity.removeForTask(taskId, session)
         await dependencies.removeForTask(project._id, taskId, session)
+        return project._id.toString()
       })
     },
   }

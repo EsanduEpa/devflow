@@ -51,11 +51,11 @@ The templates cover every local setting. Keep secrets in the ignored `.env` file
 | Backend | `MONGODB_URI` | Required connection URI for `devflow_db`. |
 | Backend | `MONGODB_TEST_URI` | Optional separate connection URI for `devflow_test`. Tests fall back to `MONGODB_URI`. |
 | Backend | `CSRF_SECRET` | Required 64-character hexadecimal signing key. Generate a different key for each environment. |
-| Backend | `APP_ORIGINS` | Allowed browser origins for writes, separated by commas. Includes `http://127.0.0.1:5173` and `http://localhost:5173` by default. |
+| Backend | `APP_ORIGINS` | Allowed browser origins for REST writes and live updates, separated by commas. Includes `http://127.0.0.1:5173` and `http://localhost:5173` by default. |
 | Backend | `PASSWORD_RESET_ORIGIN` | Browser origin used in reset links. It must be in `APP_ORIGINS`. The first allowed origin is the fallback. |
 | Backend | `SMTP_HOST`, `SMTP_PORT`, `MAIL_FROM` | Password-recovery mail server and sender. The template uses loopback port `1025` and a test sender. |
 | Backend | `SMTP_USER`, `SMTP_PASSWORD` | Optional authenticated SMTP settings. Set both for providers that require credentials. |
-| Frontend | `FRONTEND_PORT`, `API_PROXY_TARGET` | Vite loopback port and target for `/api` requests. Defaults are `5173` and `http://127.0.0.1:3000`. |
+| Frontend | `FRONTEND_PORT`, `API_PROXY_TARGET` | Vite loopback port and backend target for `/api` and `/socket.io`. Defaults are `5173` and `http://127.0.0.1:3000`. |
 
 `NODE_ENV=production` enables secure cookies, requires HTTPS origins, and requires `SMTP_HOST` and `MAIL_FROM`. For the documented local HTTP workflow, leave it unset.
 
@@ -68,6 +68,8 @@ npm --prefix backend run dev
 ```sh
 npm --prefix frontend run dev
 ```
+
+Vite forwards REST and WebSocket connections to the same backend. Open the frontend using an origin listed in `APP_ORIGINS` for project live updates.
 
 Open [DevFlow](http://127.0.0.1:5173). Create an account, log in, refresh **Workspaces** to check that your session persists, then use the account menu to log out. The account menu also switches Studio themes. You can check Express directly.
 

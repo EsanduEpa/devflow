@@ -290,22 +290,24 @@ The current `test:db` script lists its test files explicitly. Add each new datab
 
 **Outcome** Authorized teammates receive updates for committed task assignments, status changes, Kanban movement, and comments. Reconnecting clients recover current data.
 
+**Evidence** [M23 verification](engineering-notes/017-m23-realtime-verification.md) · [Live event contract](API_REFERENCE.md#project-live-updates) · [Demo](DEMO.md#m23-live-update-walkthrough)
+
 **Prerequisites** M19, M21, and M22, with the underlying REST workflows verified.
 
 **Study and understand** Socket handshakes, membership-scoped rooms, event delivery, and reconnect synchronization. [Socket.IO rooms](https://socket.io/docs/v4/rooms/) · [Socket.IO delivery guarantees](https://socket.io/docs/v4/delivery-guarantees/)
 
 **Steps to complete**
 
-1. [ ] Attach Socket.IO to the Express HTTP server and wire the frontend through the approved local origin and proxy setup. If these packages are absent, install them from the repository root.
+1. [x] Attach Socket.IO to the Express HTTP server and wire the frontend through the approved local origin and proxy setup. If these packages are absent, install them from the repository root.
 
    ```bash
    npm --prefix backend install socket.io
    npm --prefix frontend install socket.io-client
    ```
 
-2. [ ] Reuse authentication for the connection and authorize each project room subscription. Define how a room subscription stops when a user's session or project access is revoked.
-3. [ ] Emit a small, documented event after each successful commit. Include only the routing and freshness information needed to update authorized clients.
-4. [ ] Invalidate scoped TanStack Query data or apply a newer version where appropriate. Refetch current data after reconnect, and handle duplicate or late events and project navigation.
+2. [x] Reuse authentication for the connection and authorize each project room subscription. Define how a room subscription stops when a user's session or project access is revoked.
+3. [x] Emit a small, documented event after each successful commit. Include only the routing and freshness information needed to update authorized clients.
+4. [x] Invalidate scoped TanStack Query data or apply a newer version where appropriate. Refetch current data after reconnect, and handle duplicate or late events and project navigation.
 
 **Verify and test** Open the same project in two authorized sessions and try assignment, movement, and a comment. Confirm a third session outside the project receives nothing. Disconnect one browser, make changes, and reconnect. Test access removal from a connected browser.
 

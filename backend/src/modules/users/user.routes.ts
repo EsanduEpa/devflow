@@ -9,6 +9,7 @@ import type { userModel } from './user.model.js'
 import { userRepository } from './user.repository.js'
 import { changePasswordSchema, updateProfileSchema } from './user.schema.js'
 import { userService } from './user.service.js'
+import type { Realtime } from '../realtime/realtime.js'
 
 export function userRoutes(
   users: ReturnType<typeof userModel>,
@@ -17,6 +18,7 @@ export function userRoutes(
   cookies: AuthCookies,
   verifyCsrf: RequestHandler,
   limitPasswordAttempts: RequestHandler,
+  live?: Realtime,
 ) {
   const controller = userController(userService(userRepository(users, sessions)), cookies)
   const requireUser = authenticate(auth, cookies)
@@ -26,6 +28,6 @@ export function userRoutes(
     next()
   })
   router.patch('/me', requireUser, verifyCsrf, validateRequest(updateProfileSchema), controller.updateProfile)
-  router.patch('/me/password', requireUser, verifyCsrf, limitPasswordAttempts, validateRequest(changePasswordSchema), controller.changePassword)
+  router.patch('/me/password', requireUser, verifyCsrf, limitPasswordAttempts, validateRequest(changePasswordSchema), live?.protect(controller.changePassword) ?? controller.changePassword)
   return router
 }
