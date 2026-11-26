@@ -98,7 +98,7 @@ export function AppShell({ user, theme, onToggle, current, children }: {
     queryFn: ({ signal }) => getTask(taskId, signal),
     enabled: !!taskId && revoked?.path !== path, retry: false, gcTime: 0,
   })
-  const projectId = (matchPath('/projects/:projectId/*', path)?.params.projectId ?? (task.isSuccess ? task.data.projectId : '')).toLowerCase()
+  const projectId = (matchPath('/projects/:projectId/*', path)?.params.projectId ?? task.data?.projectId ?? '').toLowerCase()
   const accessLost = revoked?.projectId === projectId || revoked?.path === path
   const projectQuery = useQuery({
     queryKey: projectKeys.details(user.id, projectId),
@@ -117,11 +117,13 @@ export function AppShell({ user, theme, onToggle, current, children }: {
 
   const openTaskId = matchPath('/tasks/:taskId', actual.pathname)?.params.taskId?.toLowerCase()
   const socket = useLiveSocket(user.id)
+  // Keep the last authorized subscription long enough to receive revocation after a failed refetch.
+  const liveProject = accessLost ? undefined : projectQuery.data
   useProjectLive({
     socket,
     userId: user.id,
-    projectId: project?.id,
-    workspaceId: project?.workspaceId,
+    projectId: liveProject?.id,
+    workspaceId: liveProject?.workspaceId,
     taskId: openTaskId,
     onRevoked: (id) => setRevoked({ projectId: id, path }),
   })

@@ -375,17 +375,19 @@ The current `test:db` script lists its test files explicitly. Add each new datab
 
 **Outcome** Evidence that the full collaboration workflow works across users and the existing MVP still passes.
 
+**Evidence** [M26 verification and baseline comparison](engineering-notes/020-m26-stage2-verification.md) · [Four-session browser journey](../backend/e2e/collaboration.e2e.ts)
+
 **Prerequisites** M17–M25.
 
 **Study and understand** Integration versus end-to-end testing, race-condition tests, and reproducible measurements.
 
 **Steps to complete**
 
-1. [ ] Check Stage 1 login, password recovery, workspaces, invitations, projects, search, task movement, and existing dashboard behavior.
-2. [ ] Add or finish automated coverage for sprint uniqueness and rollback, role and project boundaries, comment ownership, activity consistency, dependency cycles, stale writes, room access, and notification privacy and deduplication.
-3. [ ] Run the collaboration journey below with separate user sessions. Cover reconnect, access revocation, and both existing and newly created task records.
-4. [ ] Run the full verification commands. Record test counts and measure representative Stage 2 list, dashboard, and collaboration workflows against the baseline with dataset and run conditions documented.
-5. [ ] Fix defects found during verification and rerun the affected suites, followed by the full release checks.
+1. [x] Check Stage 1 login, password recovery, workspaces, invitations, projects, search, task movement, and existing dashboard behavior.
+2. [x] Add or finish automated coverage for sprint uniqueness and rollback, role and project boundaries, comment ownership, activity consistency, dependency cycles, stale writes, room access, and notification privacy and deduplication.
+3. [x] Run the collaboration journey below with separate user sessions. Cover reconnect, access revocation, and both existing and newly created task records.
+4. [x] Run the full verification commands. Record test counts and measure representative Stage 2 list, dashboard, and collaboration workflows against the baseline with dataset and run conditions documented.
+5. [x] Fix defects found during verification and rerun the affected suites, followed by the full release checks.
 
 **Verify and test** Use the full command table in section B and the collaboration journey below. Verify the test runner discovers every added suite.
 
