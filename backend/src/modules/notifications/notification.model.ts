@@ -1,6 +1,6 @@
 import { Schema, type Connection } from 'mongoose'
 
-export const notificationKinds = ['ASSIGNMENT', 'MENTION', 'REVIEW', 'DEADLINE', 'INVITATION'] as const
+export const notificationKinds = ['ASSIGNMENT', 'MENTION', 'REVIEW', 'REOPENED', 'DEADLINE', 'INVITATION'] as const
 export type NotificationKind = typeof notificationKinds[number]
 
 const schema = new Schema({

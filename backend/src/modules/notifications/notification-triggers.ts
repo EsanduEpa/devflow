@@ -12,8 +12,12 @@ export function notificationTriggers(repository: NotificationRepository, live?: 
       const events: NotificationInput[] = []
       const assignee = current.assigneeId?.toString()
       const manager = project.managerId.toString()
-      if (assignee && assignee !== actorId && assignee !== previous?.assigneeId?.toString()) {
-        events.push({ recipientId: assignee, kind: 'ASSIGNMENT', occurrenceId, taskId })
+      if (assignee && assignee !== actorId) {
+        if (assignee !== previous?.assigneeId?.toString()) {
+          events.push({ recipientId: assignee, kind: 'ASSIGNMENT', occurrenceId, taskId })
+        } else if (previous?.status === 'DONE' && current.status !== 'DONE') {
+          events.push({ recipientId: assignee, kind: 'REOPENED', occurrenceId, taskId })
+        }
       }
       if (current.status === 'IN_REVIEW' && previous?.status !== 'IN_REVIEW' && manager !== actorId) {
         events.push({ recipientId: manager, kind: 'REVIEW', occurrenceId, taskId })

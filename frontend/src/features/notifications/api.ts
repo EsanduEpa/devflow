@@ -2,7 +2,7 @@ import { apiRequest, submitApi } from '../../shared/api'
 
 export type NotificationItem = {
   id: string
-  kind: 'ASSIGNMENT' | 'MENTION' | 'REVIEW' | 'DEADLINE' | 'INVITATION'
+  kind: 'ASSIGNMENT' | 'MENTION' | 'REVIEW' | 'REOPENED' | 'DEADLINE' | 'INVITATION'
   createdAt: string
   readAt: string | null
   unavailable: boolean

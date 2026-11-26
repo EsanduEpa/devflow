@@ -118,10 +118,16 @@ test('opens the inbox over the current page, refreshes across sessions and hides
     await expect(inbox(page).getByRole('heading', { name: 'Task ready for review' })).toBeVisible()
     await expect(bell(page, 1)).toBeVisible()
 
+    await write(page.request, taskPath + '/status', 200, 'PATCH', { status: 'DONE' })
+    await write(page.request, taskPath + '/status', 200, 'PATCH', { status: 'TODO' })
+    const reopened = inbox(other).getByRole('listitem').filter({ has: other.getByRole('heading', { name: 'Task reopened' }) })
+    await expect(reopened.getByRole('link', { name: task.title })).toBeVisible()
+    await expect(bell(other, 3)).toBeVisible()
+
     await write(page.request, projectPath + '/members/' + developerId, 204, 'DELETE')
-    await expect(other.getByRole('heading', { name: 'Item unavailable' })).toHaveCount(3)
+    await expect(other.getByRole('heading', { name: 'Item unavailable' })).toHaveCount(4)
     await expect(other.getByRole('link', { name: task.title })).toHaveCount(0)
-    await expect(bell(other, 2)).toBeVisible()
+    await expect(bell(other, 3)).toBeVisible()
     await expect.poll(() => dev.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1)
   } finally {
     await phone.close()

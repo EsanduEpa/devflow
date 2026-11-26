@@ -11,6 +11,7 @@ const headlines: Record<NotificationItem['kind'], string> = {
   ASSIGNMENT: 'Task assigned to you',
   MENTION: 'You were mentioned',
   REVIEW: 'Task ready for review',
+  REOPENED: 'Task reopened',
   DEADLINE: 'Task deadline approaching',
   INVITATION: 'Workspace invitation',
 }

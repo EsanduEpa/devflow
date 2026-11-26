@@ -165,6 +165,31 @@ it('notifies only an existing matching invitee and keeps the acceptance URL out 
   expect((await inbox(outsider.client))[0]).not.toHaveProperty('workspaceName')
 }, 65_000)
 
+it('notifies the current assignee once per reopening and skips self-reopens', async () => {
+  const task = await createTask('Reopen completed work', { assigneeId: owner.id, status: 'DONE' })
+  const path = '/tasks/' + task.id
+  const unreadBefore = await unread(developer.client)
+  const ownerUnreadBefore = await unread(owner.client)
+
+  await write(owner.client, 'patch', path + '/status', 200, { status: 'TODO' })
+  expect(await unread(owner.client)).toBe(ownerUnreadBefore)
+
+  await write(owner.client, 'patch', path + '/status', 200, { status: 'DONE' })
+  await write(owner.client, 'patch', path, 200, { assigneeId: developer.id })
+  expect((await inbox(developer.client)).filter(({ task: link }) => link?.id === task.id).map(({ kind }) => kind)).toEqual(['ASSIGNMENT'])
+
+  await write(owner.client, 'patch', path + '/status', 200, { status: 'TODO' })
+  await write(owner.client, 'patch', path + '/status', 200, { status: 'TODO' })
+  await write(owner.client, 'patch', path + '/status', 200, { status: 'IN_PROGRESS' })
+  await write(owner.client, 'patch', path + '/status', 200, { status: 'DONE' })
+  await write(owner.client, 'patch', path + '/status', 200, { status: 'IN_PROGRESS' })
+
+  const entries = (await inbox(developer.client)).filter(({ task: link }) => link?.id === task.id)
+  expect(entries.map(({ kind }) => kind)).toEqual(['REOPENED', 'REOPENED', 'ASSIGNMENT'])
+  expect(entries[0]).toMatchObject({ task: { id: task.id, title: task.title }, readAt: null })
+  expect(await unread(developer.client)).toBe(unreadBefore + 3)
+}, 65_000)
+
 it('isolates inboxes, preserves read timestamps and redacts links after project access is lost', async () => {
   const task = await createTask('Read privately', { assigneeId: developer.id })
   const entry = (await inbox(developer.client)).find(({ task: link }) => link?.id === task.id)!
