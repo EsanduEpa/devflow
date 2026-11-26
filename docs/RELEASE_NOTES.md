@@ -1,8 +1,18 @@
-# DevFlow Stage 1 MVP release notes
+# DevFlow release notes
 
-Planned release tag `v1.0.0-mvp`.
+## Stage 2 collaboration · `v1.1.0-collaboration` (proposed)
 
-## Included
+- Plan sprints, track progress, and roll unfinished tasks into a later sprint or the backlog. Completed sprints keep their progress at completion.
+- Add task comments and mentions, see task history in Activity, and track dependencies with cycle prevention.
+- Move cards by drag and drop or the keyboard. Recover a task draft if someone else saved a change first.
+- See authorized project changes live and catch up after reconnecting. The bell opens over the current page and shows assignment, mention, review, reopened task, deadline, and invitation notifications.
+- Combine sprint, dependency, and existing task filters. Open filtered lists from the dashboard.
+
+Existing tasks open with no sprint and version zero when those fields are absent. Activity starts with changes recorded in Stage 2. Live updates use a single backend process and refetch from REST after reconnect. [Setup and upgrade procedure](STAGE2_RELEASE.md) · [Stage 2 demo](DEMO.md#stage-2-collaboration-demo) · [Verification](engineering-notes/020-m26-stage2-verification.md)
+
+## Stage 1 MVP · `v1.0.0-mvp`
+
+### Included
 
 - Registration, session login and logout, profiles, password changes, and email-based password recovery.
 - Private workspaces, shareable invitations, workspace roles, and project membership.
@@ -11,27 +21,8 @@ Planned release tag `v1.0.0-mvp`.
 - Studio Light and Studio Dark, workspace switching, and responsive task details.
 - Repeatable local setup, documented REST contracts, and backend and browser verification.
 
-## Current limits
+### Stage 1 limits
 
 Board changes appear for other users after a refresh or refetch. On the board, status changes use the **Move to** control. Owners share invitation links directly. Task search supports title words and exact task IDs. Real password-reset delivery requires a configured SMTP provider. The release supports the documented local setup and requires a transaction-capable MongoDB deployment.
 
-## Planned Stage 2
-
-The project scope puts sprints, comments, activity history, notifications, and real-time collaboration in later work. [Approved project scope](PROJECT_SCOPE.md#stage-2--advanced-team-collaboration)
-
-## Publish after the M15 pull request is merged
-
-Update local `main` and confirm its tip contains the verified M15 release changes. Then create and push the annotated tag.
-
-```sh
-git switch main
-git pull --ff-only origin main
-git log -1 --oneline
-```
-
-```sh
-git tag -a v1.0.0-mvp -m "DevFlow Stage 1 MVP"
-git push origin refs/tags/v1.0.0-mvp
-```
-
-Use this file for the GitHub release description. [Verification record](engineering-notes/008-mvp-verification.md)
+[Stage 1 verification record](engineering-notes/008-mvp-verification.md)

@@ -407,9 +407,9 @@ The current `test:db` script lists its test files explicitly. Add each new datab
 
 **Steps to complete**
 
-1. [ ] Update setup, API and Socket.IO contracts, database and index changes, compatibility notes, and release notes. Explain configuration, test data requirements, and rollout or rollback steps where needed.
-2. [ ] Update the demo guide with the collaboration journey and test actors. Rehearse the demo with disposable data and practice explaining the decisions behind it.
-3. [ ] Run the final checklist from a fresh checkout using the lockfiles and environment templates. Verify the application works with a fresh database and representative Stage 1 data in an isolated database.
+1. [x] Update setup, API and Socket.IO contracts, database and index changes, compatibility notes, and release notes. Explain configuration, test data requirements, and rollout or rollback steps where needed.
+2. [x] Update the demo guide with the collaboration journey and test actors. Rehearse the demo with disposable data and practice explaining the decisions behind it.
+3. [x] Run the final checklist from a fresh checkout using the lockfiles and environment templates. Verify the application works with a fresh database and representative Stage 1 data in an isolated database.
 4. [ ] After review and merge, verify the release commit on `main`. Use the agreed Stage 2 tag, with `v1.1.0-collaboration` as a proposed name, and publish release notes for the verified commit.
 
 **Verify and test** Repeat the full command table and the demo using the written instructions. Check the changelog, API references, and release tag against the merged commit.
@@ -419,6 +419,8 @@ The current `test:db` script lists its test files explicitly. Add each new datab
 **Done when** A fresh checkout passes, the demo and documentation match the release, and the verified commit is tagged.
 
 **Suggested commit** `docs: prepare stage 2 collaboration release`
+
+[Candidate verification and publishing procedure](STAGE2_RELEASE.md)
 
 ## D. Stage 2 acceptance journey
 
@@ -434,12 +436,12 @@ Use an Owner or assigned Manager, two Developers who are project members, and an
 
 ### Final exit checklist
 
-- [ ] Sprint planning, progress, completion, and rollover passed.
-- [ ] Comments, mentions, activity, and notification triggers passed.
-- [ ] Dependency cycle prevention and stale-write protection passed under concurrent requests.
-- [ ] Keyboard status changes, drag-and-drop, live updates, and reconnect recovery passed.
-- [ ] Filters and dashboard metrics matched the documented data and access rules.
-- [ ] Stage 1 regressions, Stage 2 suites, fresh-clone instructions, and the demo passed.
+- [x] Sprint planning, progress, completion, and rollover passed.
+- [x] Comments, mentions, activity, and notification triggers passed.
+- [x] Dependency cycle prevention and stale-write protection passed under concurrent requests.
+- [x] Keyboard status changes, drag-and-drop, live updates, and reconnect recovery passed.
+- [x] Filters and dashboard metrics matched the documented data and access rules.
+- [x] Stage 1 regressions, Stage 2 suites, fresh-clone instructions, and the demo passed.
 - [ ] Release notes and tag identify the verified merged commit.
 
 ### Milestone progress log

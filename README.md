@@ -1,6 +1,15 @@
 # DevFlow
 
-DevFlow helps software development teams organize workspaces, manage projects, assign tasks, and track progress on a five-column Kanban board. Stage 1 is the MERN MVP.
+DevFlow helps software development teams organize workspaces, manage projects, assign tasks, and track progress on a five-column Kanban board. Stage 2 adds sprint planning and live collaboration to the MERN MVP.
+
+## Stage 2 collaboration
+
+- Plan and complete sprints, carry unfinished work forward, and compare progress on the dashboard.
+- Discuss tasks with comments and mentions, follow changes in Activity, and see which tasks are blocked by dependencies.
+- Move tasks by dragging or using the keyboard. Recover a draft when another edit saves first.
+- See live project updates and open notifications from the bell on the current page.
+
+Follow the [Stage 2 demo](docs/DEMO.md#stage-2-collaboration-demo) or review the [release notes](docs/RELEASE_NOTES.md) and [release procedure](docs/STAGE2_RELEASE.md).
 
 ## Stage 1 scope
 
@@ -172,7 +181,7 @@ npm --prefix backend run test:db
 
 The tests use `devflow_test` and require a transaction-capable MongoDB deployment. Give your configured database user read and write access to `devflow_test`, or set `MONGODB_TEST_URI` in `backend/.env` to use separate test credentials. Each run creates and removes its own temporary collections. The password recovery tests use a temporary local inbox, so they run without Mailpit or real email credentials.
 
-## Run the Stage 1 browser and performance checks
+## Run the browser and performance checks
 
 Install Playwright’s Chromium headless browser once, then run the browser suite from the repository root. The suite builds the frontend and starts its own local server. To watch it, install full Chromium with `npm --prefix backend exec -- playwright install chromium`, then run `npm --prefix backend run test:e2e -- --headed`. [Playwright browser installation](https://playwright.dev/docs/browsers)
 
@@ -187,11 +196,12 @@ Run the API timing and MongoDB query plan checks separately.
 npm --prefix backend run test:performance
 ```
 
-Both commands use temporary collections in `devflow_test`. See the [Stage 1 verification notes](docs/engineering-notes/006-stage1-verification.md) for acceptance coverage and measured results.
+Both commands use temporary collections in `devflow_test`. The browser suite includes a four-session collaboration journey with both a legacy task and a new task. See the [Stage 2 verification notes](docs/engineering-notes/020-m26-stage2-verification.md) for acceptance coverage and measured results.
 
 ## Project documentation
 
 - [Stage 1 milestone guide](docs/DevFlow_Stage1_Complete_Milestone_Guide_M0-M15.md) and [requirements](docs/SRS.md)
+- [Stage 2 milestone guide](docs/DevFlow_Stage2_Complete_Milestone_Guide_M16-M27.md)
 - [Architecture](docs/SYSTEM_DESIGN.md), [data model](docs/DATABASE_DESIGN.md), and [Studio design specification](docs/UI_UX_DESIGN.md)
 - [Implemented API reference](docs/API_REFERENCE.md) and [engineering decisions](docs/engineering-notes/007-mvp-decisions.md)
 - [Release notes](docs/RELEASE_NOTES.md), [demo guide](docs/DEMO.md), and [MVP verification record](docs/engineering-notes/008-mvp-verification.md)

@@ -42,4 +42,4 @@ Playwright also exercised Studio theme persistence, keyboard focus, workspace sw
 
 Reviewed the direct dependencies and entry points for Stage 1 usage. The release base contains the six planning documents and the Studio specification. The tracked environment files are the example templates. A scan for common credential patterns matched a synthetic MongoDB URI in the error-sanitization test.
 
-Publish the annotated `v1.0.0-mvp` tag from `main` after the M15 pull request merges. [Release and tag commands](../RELEASE_NOTES.md#publish-after-the-m15-pull-request-is-merged)
+The Stage 1 release uses the annotated `v1.0.0-mvp` tag. [Stage 1 release notes](../RELEASE_NOTES.md#stage-1-mvp--v100-mvp)

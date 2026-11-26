@@ -1,4 +1,33 @@
-# DevFlow MVP demo
+# DevFlow demo
+
+## Stage 2 collaboration demo
+
+Use a disposable MongoDB replica set and the [local setup](../README.md#run-locally) for a manual rehearsal, or run the automated rehearsal below. Use four separate browser profiles so each person keeps their own login.
+
+| Account | Setup |
+| --- | --- |
+| Owner (`owner@example.test`) | Create the workspace and project. Assign yourself as project Manager. |
+| Alice (`alice@example.test`) | Accept a Developer invitation and join the project. |
+| Blake (`blake@example.test`) | Accept a Developer invitation and join the project. |
+| Outsider (`outsider@example.test`) | Accept a Developer invitation to the workspace only. |
+
+1. As Owner, create **Current release** and **Next release** in **Sprints**, with Next release starting after Current release ends. Add **Prepare release** and **Publish release** to Current release, then start it.
+2. Assign Prepare release to Alice. In Alice’s session, open the bell and follow the assignment link. Under **Comments**, select Blake in **Mention someone** and post a review request. Blake should see the comment and a mention in their bell.
+3. As Owner, add Prepare release as a prerequisite of Publish release. Publish release shows **Blocked**. Try adding Publish release as a prerequisite of Prepare release. The app rejects the cycle.
+4. Type a description for Prepare release in **Edit task** in the Owner session. In Alice’s session, move it to **In Progress** on the Board. Blake sees the status without refreshing. Save the Owner draft and confirm **Task changed** preserves it. Use **Retry my changes** to save it.
+5. Put Blake’s browser offline using its developer tools. As Alice, move Prepare release to **In Review** and post a second comment mentioning Blake. Reconnect Blake and confirm the Board, **Activity**, comments, and bell count catch up. The Outsider should see an access error on the copied project URL.
+6. Check the Owner’s **Task ready for review** notification and move Prepare release to **Done**. Complete Current release and roll Publish release into Next release. The Dashboard should show Current release at one of two done at completion and Next release at zero of one done. Follow **View tasks** for Next release and confirm Publish release is the only task and is unblocked.
+7. Have Blake open Prepare release from the Board. Remove Blake under **Project settings → Project members**. Blake should see the project access message, the task panel should close, and the two mention notifications should show **Item unavailable**.
+
+Run the automated rehearsal from the repo root. It creates its own accounts and collections in `devflow_test`, includes a task stored in the Stage 1 format, and checks that the Outsider is also denied a Socket.IO subscription. [Browser setup](../README.md#run-the-browser-and-performance-checks)
+
+```sh
+npm --prefix backend run test:e2e -- collaboration.e2e.ts
+```
+
+Explain that MongoDB stores the result and Socket.IO tells authorized browsers when to refetch it. Show how task versions let the Owner retry a draft after Alice’s move, and why sprint completion keeps a snapshot after unfinished work moves elsewhere. [Stage 2 verification](engineering-notes/020-m26-stage2-verification.md)
+
+## Stage 1 MVP demo
 
 Allow about eight minutes. Start both apps using the [local setup guide](../README.md#run-locally). Prepare two fictional accounts such as `owner@example.test` and `developer@example.test` in separate browser sessions. Use locally chosen passwords and an empty workspace named **Release workshop**.
 
@@ -13,7 +42,7 @@ Allow about eight minutes. Start both apps using the [local setup guide](../READ
 | 6:40–7:30 | Find the task on **Task list**, open its details, and switch Studio themes. | Search and pagination go through the project-scoped API. The drawer keeps the current board or list in context. |
 | 7:30–8:30 | Show the architecture diagram and verification results. | Walk through one task status update from React to Express to MongoDB, then back to the board. |
 
-Run the browser workflow with fictional users and isolated test data for a repeatable rehearsal. With full Chromium installed, use this command from the repository root. [Browser setup](../README.md#run-the-stage-1-browser-and-performance-checks)
+Run the browser workflow with fictional users and isolated test data for a repeatable rehearsal. With full Chromium installed, use this command from the repository root. [Browser setup](../README.md#run-the-browser-and-performance-checks)
 
 ```sh
 npm --prefix backend run test:e2e -- --headed --grep "invited Developer workflow"

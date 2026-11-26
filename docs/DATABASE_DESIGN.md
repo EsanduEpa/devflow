@@ -1548,6 +1548,17 @@ Tasks store a `version` that starts at zero. Existing tasks with no stored versi
 
 The `notifications` collection stores the recipient, kind, occurrence ID, task or invitation reference, creation time and nullable read time. A unique index on recipient, kind and occurrence ID deduplicates inserts. Separate indexes support the recipient’s newest-first inbox and unread count. Immediate notification writes share the source transaction. The deadline scan uses the task due-date index and rechecks eligibility inside the same workspace write boundary as task and membership changes.
 
+| Added index | Query or constraint |
+| --- | --- |
+| `notifications { recipientId: 1, kind: 1, occurrenceId: 1 }` (unique) | Deduplicate notification occurrences |
+| `notifications { recipientId: 1, createdAt: -1, _id: -1 }` | Order the inbox and resolve timestamp ties |
+| `notifications { recipientId: 1, readAt: 1 }` | Count unread notices for a recipient |
+| `tasks { dueDate: 1 }` | Find deadline reminder candidates across projects |
+
+## Stage 2 startup and compatibility
+
+Stage 2 initializes its models and indexes before the API starts listening. The rollout adds collections, indexes and optional fields to existing data. A Stage 1 task reads as `sprintId: null` and `version: 0` when those fields are missing. Activity starts with tracked Stage 2 changes. Task filters combine project membership, sprint, and current prerequisite status before pagination. See the [release procedure](STAGE2_RELEASE.md) for rollout and rollback and the [M26 verification](engineering-notes/020-m26-stage2-verification.md) for measured query plans.
+
 ## Future collections
 
 **Stage 3**
