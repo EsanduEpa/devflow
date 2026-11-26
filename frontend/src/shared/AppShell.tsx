@@ -203,8 +203,8 @@ export function AppShell({ user, theme, onToggle, current, children }: {
             </nav>
           </div>
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-            <NotificationBell key={actual.key} userId={user.id} />
-            <AccountMenu key={actual.key} user={user} theme={theme} onToggle={onToggle} />
+            <NotificationBell key={`notifications-${actual.key}`} userId={user.id} />
+            <AccountMenu key={`account-${actual.key}`} user={user} theme={theme} onToggle={onToggle} />
           </div>
         </header>
         <main id="main-content" tabIndex={-1} className="app-content">

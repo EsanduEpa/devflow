@@ -98,7 +98,13 @@ test('opens the inbox over the current page, refreshes across sessions and hides
     await bell(other, 2).click()
     await expect(inbox(other).getByRole('heading', { name: 'Task assigned to you' })).toBeVisible()
 
-    await page.goto(fixture.origin + '/workspaces')
+    await page.goto(fixture.origin + projectPath + '/sprints')
+    const navigation = page.getByRole('navigation', { name: 'Main navigation' })
+    for (const [label, path] of [['Task list', '/tasks'], ['Sprints', '/sprints'], ['Task list', '/tasks']]) {
+      await navigation.getByRole('link', { name: label, exact: true }).click()
+      await expect(page).toHaveURL(fixture.origin + projectPath + path)
+      await expect(page.getByRole('button', { name: /^Notifications(?:,|$)/ })).toHaveCount(1)
+    }
     await bell(page, 0).click()
     await expect(inbox(page)).toBeVisible()
     await page.getByRole('main').click({ position: { x: 8, y: 8 } })
